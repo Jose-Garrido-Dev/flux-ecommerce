@@ -12,8 +12,6 @@ x-php: &php
   depends_on:
     postgres:
       condition: service_healthy
-    redis:
-      condition: service_healthy
   restart: unless-stopped
 
 services:
@@ -79,8 +77,10 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # OPCIONAL: solo se levanta con --profile redis (ver docs/INSTALACION.md, sección 8.2)
   redis:
     image: redis:7-alpine
+    profiles: ["redis"]
     command: redis-server --appendonly yes
     volumes:
       - redisdata:/data
@@ -90,8 +90,10 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # OPCIONAL: solo se levanta con --profile search
   meilisearch:
     image: getmeili/meilisearch:v1.11
+    profiles: ["search"]
     environment:
       MEILI_MASTER_KEY: ${MEILISEARCH_KEY}
       MEILI_ENV: production

@@ -24,9 +24,10 @@ class HealthTest extends TestCase
             ->assertJsonPath('checks.scheduler', 'stale');
     }
 
-    public function test_readiness_ok_with_recent_heartbeat(): void
+    public function test_readiness_ok_with_recent_heartbeats(): void
     {
         SystemHeartbeat::beat('scheduler');
+        SystemHeartbeat::beat('worker');
 
         $this->getJson('/api/health/ready')->assertOk()->assertJsonPath('status', 'ok');
     }

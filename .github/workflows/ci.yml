@@ -20,9 +20,6 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U flux -d flux_test"
           --health-interval 5s --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports: ["6379:6379"]
     defaults:
       run:
         working-directory: backend
@@ -33,7 +30,6 @@ jobs:
       DB_DATABASE: flux_test
       DB_USERNAME: flux
       DB_PASSWORD: flux
-      REDIS_HOST: 127.0.0.1
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2

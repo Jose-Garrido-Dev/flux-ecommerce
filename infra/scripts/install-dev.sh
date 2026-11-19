@@ -17,7 +17,7 @@ fi
 echo "==> Construyendo imágenes y levantando servicios base"
 export UID GID="$(id -g)"
 docker compose build app
-docker compose up -d postgres redis meilisearch mailpit
+docker compose up -d postgres mailpit
 
 echo "==> Instalando dependencias PHP"
 docker compose run --rm app composer install --no-interaction

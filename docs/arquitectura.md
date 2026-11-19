@@ -16,6 +16,8 @@ Este archivo resume las decisiones que todo desarrollador debe respetar.
 7. **Permisos en el backend.** Toda acción pasa por Policies y permisos `modulo.accion`; ocultar un botón no es seguridad.
 8. **Personalización fuera del núcleo.** Lo específico de un cliente va en `custom/` o en paquetes, nunca editando `backend/app/Domain`.
 
+9. **Sin servicios externos obligatorios.** Todo corre en el servidor de la tienda; Redis, Meilisearch y S3 son opcionales y desactivados por defecto.
+
 ## Organización del backend
 
 ```text
@@ -36,6 +38,7 @@ Un dominio llama a otro solo mediante sus Actions o eventos.
 | Panel | Filament 5 |
 | Storefront | Next.js 15 (App Router), React 19, Tailwind 4 |
 | Base de datos | PostgreSQL 16 |
-| Colas, caché, sesiones | Redis 7 |
-| Búsqueda | Meilisearch (opcional) |
-| Despliegue | Docker Compose + Caddy |
+| Colas, caché, sesiones | PostgreSQL (driver `database`); Redis opcional |
+| Búsqueda | PostgreSQL; Meilisearch opcional |
+| Archivos | Disco del servidor; S3 opcional |
+| Despliegue | Docker Compose + Caddy, o detrás del servidor web de Webuzo |

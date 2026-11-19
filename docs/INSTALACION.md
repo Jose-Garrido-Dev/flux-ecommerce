@@ -28,11 +28,14 @@ Esta guía explica qué hay que instalar, qué hay que configurar y cómo dejar 
 | Panel administrativo | Filament 5 (dentro de Laravel) | Administración de la tienda en `/admin` | `backend/app/Filament/` |
 | Storefront | Next.js 15 (React 19, Tailwind 4) | La tienda pública que ven los compradores | `storefront/` |
 | Base de datos | PostgreSQL 16 | Toda la información de la tienda | servicio `postgres` |
-| Colas y caché | Redis 7 | Correos, webhooks, tareas en segundo plano, caché, sesiones | servicio `redis` |
-| Búsqueda | Meilisearch 1.11 (opcional) | Buscador rápido del catálogo | servicio `meilisearch` |
+| Colas, caché y sesiones | La misma base PostgreSQL (tablas `jobs`, `cache`, `sessions`) | Correos, webhooks, tareas en segundo plano | — |
+| Búsqueda | La misma base PostgreSQL | Buscador del catálogo | — |
+| Archivos | Disco del servidor (`backend/storage`) | Imágenes, etiquetas, comprobantes | volumen `storage` |
 | Correo de desarrollo | Mailpit | Ver los correos que envía el sistema sin enviarlos de verdad | servicio `mailpit` |
 | Worker | `php artisan queue:work` | Procesa las colas | servicio `worker` |
 | Scheduler | `php artisan schedule:work` | Tareas programadas (reservas vencidas, informes, respaldos) | servicio `scheduler` |
+
+**Todo corre en tu propio servidor.** La configuración por defecto no necesita contratar ningún servicio externo: ni Redis, ni S3, ni buscadores pagados. Redis, Meilisearch y S3 existen solo como opciones para tiendas muy grandes (sección 8.2). Los únicos servicios externos son los que el negocio necesita por naturaleza: pasarela de pago, courier y correo (sección 8).
 
 La arquitectura completa, el esquema de base de datos y los flujos están en el documento de diseño técnico (ver [docs/arquitectura.md](arquitectura.md)).
 
@@ -54,11 +57,10 @@ Recursos sugeridos para Docker: 4 CPU, 6 GB de RAM, 20 GB de disco.
 
 | Programa | Versión | Notas |
 | --- | --- | --- |
-| PHP | 8.3 o superior | Extensiones: `pdo_pgsql`, `pgsql`, `intl`, `zip`, `gd`, `bcmath`, `mbstring`, `xml`, `curl`, `redis`, `pcntl` (Linux/macOS) |
+| PHP | 8.3 o superior | Extensiones: `pdo_pgsql`, `pgsql`, `intl`, `zip`, `gd`, `bcmath`, `mbstring`, `xml`, `curl`, `pcntl` (Linux/macOS); `redis` solo si activas Redis |
 | Composer | 2.7 o superior | <https://getcomposer.org/download/> |
 | Node.js | 22 LTS | <https://nodejs.org/> (incluye npm) |
 | PostgreSQL | 16 | <https://www.postgresql.org/download/> |
-| Redis | 7 | En Windows usar WSL o Memurai |
 
 ### Para producción
 
@@ -67,7 +69,7 @@ Recursos sugeridos para Docker: 4 CPU, 6 GB de RAM, 20 GB de disco.
 | Servidor (VPS) | 2 vCPU, 4 GB RAM, 40 GB SSD | 4 vCPU, 8 GB RAM, 80 GB SSD |
 | Sistema operativo | Ubuntu Server 24.04 LTS | igual |
 | Dominio | uno, con acceso a su DNS | `mitienda.cl` para la tienda y `api.mitienda.cl` para backend y panel |
-| Certificado HTTPS | Let's Encrypt (gratuito, lo gestiona Caddy) | igual |
+| Certificado HTTPS | Let's Encrypt, gratuito (lo emite Caddy, o Webuzo si el servidor lo usa) | igual |
 | Correo transaccional | Proveedor SMTP o API (ver sección 8) | igual |
 
 ## 3. Instalación de desarrollo con Docker (recomendada)
@@ -89,7 +91,7 @@ El script hace, en orden:
 
 1. Verifica que Docker y Compose estén instalados.
 2. Crea `backend/.env` a partir de `backend/.env.docker.example`.
-3. Construye la imagen PHP y levanta PostgreSQL, Redis, Meilisearch y Mailpit.
+3. Construye la imagen PHP y levanta PostgreSQL y Mailpit.
 4. Instala las dependencias PHP con Composer.
 5. Genera la clave de la aplicación (`APP_KEY`).
 6. Ejecuta las migraciones y carga los datos base: las 16 regiones de Chile, los roles iniciales y el tablero de módulos.
@@ -111,7 +113,6 @@ Te pedirá nombre, correo y contraseña (mínimo 12 caracteres) y le asignará e
 | Panel administrativo | <http://localhost:8000/admin> |
 | Estado del backend | <http://localhost:8000/api/health> y <http://localhost:8000/api/health/ready> |
 | Correos enviados (Mailpit) | <http://localhost:8025> |
-| Meilisearch | <http://localhost:7700> |
 | PostgreSQL desde tu equipo | `localhost:5432`, base `flux`, usuario `flux`, clave `flux` |
 
 ### 3.5 Comandos del día a día
@@ -144,7 +145,7 @@ CREATE DATABASE flux OWNER flux;
 ```bash
 cd backend
 cp .env.example .env
-# edita .env: DB_HOST=127.0.0.1, DB_DATABASE=flux, DB_USERNAME=flux, DB_PASSWORD=flux, REDIS_HOST=127.0.0.1
+# edita .env: DB_HOST=127.0.0.1, DB_DATABASE=flux, DB_USERNAME=flux, DB_PASSWORD=flux
 composer install
 php artisan key:generate
 php artisan migrate --seed
@@ -189,17 +190,15 @@ Nunca subas archivos `.env` al repositorio: contienen claves. El `.gitignore` ya
 | `DB_CONNECTION` | `pgsql` | Motor de base de datos |
 | `DB_HOST` / `DB_PORT` | `postgres` / `5432` | En Docker el host es el nombre del servicio |
 | `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` | | Credenciales de la base |
-| `REDIS_HOST` | `redis` | Servidor Redis |
-| `CACHE_STORE` / `QUEUE_CONNECTION` / `SESSION_DRIVER` | `redis` | Caché, colas y sesiones en Redis |
+| `CACHE_STORE` / `QUEUE_CONNECTION` / `SESSION_DRIVER` | `database` | Caché, colas y sesiones en la base de datos (sin servicios extra). `redis` solo si activas Redis (sección 8.2) |
 | `SESSION_DOMAIN` | `.mitienda.cl` | Permite compartir la sesión entre `www` y `api` |
 | `SANCTUM_STATEFUL_DOMAINS` | `www.mitienda.cl,mitienda.cl` | Dominios del storefront que pueden iniciar sesión de clientes |
 | `MAIL_MAILER` | `smtp` | Forma de envío de correo |
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_ENCRYPTION` | | Datos del proveedor SMTP (en desarrollo: `mailpit`, `1025`) |
 | `MAIL_FROM_ADDRESS` / `MAIL_FROM_NAME` | `ventas@mitienda.cl` | Remitente de los correos |
-| `SCOUT_DRIVER` | `meilisearch` o `database` | Motor de búsqueda |
-| `MEILISEARCH_HOST` / `MEILISEARCH_KEY` | `http://meilisearch:7700` | Conexión a Meilisearch |
-| `FILESYSTEM_DISK` | `local` o `s3` | Dónde se guardan imágenes y archivos |
-| `AWS_*` | | Solo si usas S3, Cloudflare R2 o MinIO |
+| `SCOUT_DRIVER` | `database` | Motor de búsqueda. `meilisearch` solo si lo activas (sección 8.2) |
+| `FILESYSTEM_DISK` | `local` | Archivos en el disco del servidor. `s3` es opcional |
+| `REDIS_*`, `MEILISEARCH_*`, `AWS_*` | vacías | Solo si activas esos servicios opcionales |
 | `LOG_CHANNEL` / `LOG_LEVEL` | `stack` / `warning` | Registros. En producción `warning` o `error` |
 
 Las credenciales de pasarelas de pago, couriers e IA **no van en el `.env`**: se ingresan desde el panel (Configuración → Pagos / Envíos / Inteligencia artificial) y se guardan cifradas con `APP_KEY`.
@@ -220,7 +219,10 @@ Lo usa `compose.prod.yml`. Ver comentarios en [`.env.example`](../.env.example).
 
 ## 6. Instalación en producción
 
-Esta guía usa un VPS con Ubuntu 24.04, Docker y Caddy como proxy con HTTPS automático.
+Hay dos caminos según tu servidor:
+
+- **Servidor limpio** (sin panel de hosting): secciones 6.1 a 6.6, con Caddy como proxy y HTTPS automático.
+- **Servidor con Webuzo** (u otro panel que ya usa los puertos 80 y 443): secciones 6.1 a 6.4 **sin instalar Caddy**, y luego la sección [6.7](#67-servidor-con-webuzo) para publicar el dominio desde Webuzo.
 
 ### 6.1 Preparar el DNS
 
@@ -245,7 +247,7 @@ ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw enable
 curl -fsSL https://get.docker.com | sh
 usermod -aG docker flux
 
-# Caddy (proxy con HTTPS automático)
+# Caddy: SOLO en un servidor sin Webuzo ni otro panel (proxy con HTTPS automático)
 apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
@@ -286,7 +288,7 @@ docker compose -f compose.prod.yml --env-file .env exec app php artisan flux:adm
 
 `db:seed` en producción carga **solo datos reales** (regiones, roles, módulos). Nunca carga productos ni pedidos de ejemplo.
 
-### 6.5 Configurar Caddy (HTTPS)
+### 6.5 Configurar Caddy (HTTPS) — solo servidor sin panel
 
 `/etc/caddy/Caddyfile`:
 
@@ -317,6 +319,65 @@ Caddy obtiene y renueva los certificados automáticamente.
 - <https://api.mitienda.cl/api/health/ready> debe responder `"status":"ok"`.
 - <https://api.mitienda.cl/admin> muestra el ingreso al panel.
 - <https://www.mitienda.cl> muestra la tienda.
+
+### 6.7 Servidor con Webuzo
+
+Si la VPS ya tiene Webuzo con otros sitios y MySQL, Flux convive sin problemas:
+
+- **PostgreSQL** corre dentro de su contenedor Docker, no se instala en el sistema y **no abre ningún puerto** hacia afuera. No toca el MySQL de Webuzo ni tus otros proyectos.
+- **La tienda y el backend** escuchan solo en `127.0.0.1:3000` y `127.0.0.1:8000` (no accesibles desde internet).
+- **Webuzo** sigue siendo dueño de los puertos 80 y 443 y del certificado HTTPS; se configura para reenviar (proxy) el dominio a esos puertos internos.
+
+> Esta sección se escribió a partir de la documentación oficial de Webuzo y **todavía no se ha probado en un servidor real**. Los nombres de menú pueden variar según la versión de Webuzo. Si algo no coincide, avísalo para corregir la guía.
+
+**Paso 1: recursos.** Revisa la memoria libre con `free -h`. Flux usa alrededor de 1 a 1,5 GB (PostgreSQL, PHP, worker, scheduler y Next.js). Con menos de 2 GB libres conviene ampliar la VPS.
+
+**Paso 2: puertos libres.** Comprueba que nada use los puertos 3000 y 8000:
+
+```bash
+sudo ss -ltnp | grep -E ':(3000|8000)\b' || echo "libres"
+```
+
+Si están ocupados, cambia `STOREFRONT_PORT` y `BACKEND_PORT` en el `.env` de la raíz.
+
+**Paso 3: instalar Docker y Flux.** Sigue las secciones 6.2 (sin la parte de Caddy ni `ufw`, porque Webuzo ya administra el firewall), 6.3 y 6.4.
+
+**Paso 4: agregar los dominios en Webuzo.** En el panel de Webuzo agrega el dominio de la tienda (por ejemplo `mitienda.cl` con `www`) y el subdominio del backend (`api.mitienda.cl`). Los registros DNS de la sección 6.1 deben apuntar a la IP de la VPS.
+
+**Paso 5: certificado HTTPS.** En el panel de usuario de Webuzo: **SSL → Automatic SSL**, y pulsa **install** en la fila de cada dominio. Webuzo emite y renueva el certificado.
+
+**Paso 6: reenviar el dominio a Flux (proxy).** Webuzo permite agregar configuración propia por dominio. Primero averigua qué servidor web usa tu Webuzo (Apache, Nginx u OpenLiteSpeed); se ve en el panel de administración, en la configuración del servidor web. Luego crea un archivo por dominio (las carpetas se crean a mano si no existen):
+
+*Si usa Apache* (`/var/webuzo-data/apache2/custom/domains/www.mitienda.cl.conf`):
+
+```apache
+ProxyPreserveHost On
+ProxyPass        / http://127.0.0.1:3000/
+ProxyPassReverse / http://127.0.0.1:3000/
+RequestHeader set X-Forwarded-Proto "https"
+```
+
+y `/var/webuzo-data/apache2/custom/domains/api.mitienda.cl.conf` igual, pero con el puerto `8000`.
+
+*Si usa Nginx* (`/var/webuzo-data/nginx/custom/domains/www.mitienda.cl.conf`):
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+}
+```
+
+y el de `api.mitienda.cl` con el puerto `8000` y además `client_max_body_size 25M;` para permitir subir imágenes.
+
+Después reinicia el servidor web desde el panel de Webuzo. En Apache, el módulo `mod_proxy` debe estar activo (si no lo está, el soporte de tu VPS o Webuzo lo puede habilitar).
+
+**Paso 7: verificar.** Las mismas comprobaciones de la sección 6.6.
+
+**Paso 8: respaldos.** Los respaldos de Webuzo cubren tus otros sitios, pero **no** la base PostgreSQL de Flux, que vive en Docker. Programa `infra/scripts/backup.sh` con cron (sección 7.2).
 
 ## 7. Operación diaria
 
@@ -381,6 +442,16 @@ Para que los correos no lleguen a spam, el proveedor de correo te dará valores 
 - **DKIM** (uno o más registros TXT o CNAME)
 - **DMARC** (TXT en `_dmarc.mitienda.cl`, por ejemplo `v=DMARC1; p=quarantine; rua=mailto:dmarc@mitienda.cl`)
 
+### 8.2 Servicios opcionales (no necesarios para empezar)
+
+Por defecto Flux no usa ninguno de estos servicios. Solo valen la pena en tiendas con mucho tráfico o catálogos muy grandes, y los tres **pueden correr en tu misma VPS** sin contratar nada:
+
+| Servicio | Cuándo considerarlo | Cómo activarlo |
+| --- | --- | --- |
+| Redis | Muchos pedidos por minuto o colas lentas | `docker compose ... --profile redis up -d` y en `backend/.env`: `CACHE_STORE=redis`, `QUEUE_CONNECTION=redis`, `SESSION_DRIVER=redis`, `REDIS_HOST=redis` |
+| Meilisearch | Catálogos de miles de productos con búsqueda tolerante a errores | `--profile search` y `SCOUT_DRIVER=meilisearch` con su clave (disponible desde la fase de catálogo) |
+| S3, Cloudflare R2 o MinIO | Muchas imágenes o varios servidores | `FILESYSTEM_DISK=s3` y variables `AWS_*`. MinIO puede correr en la misma VPS |
+
 ## 9. Primer ingreso al panel
 
 1. Entra a `/admin` con el usuario creado por `php artisan flux:admin`.
@@ -415,3 +486,6 @@ Cada push a GitHub ejecuta automáticamente estas verificaciones (`.github/workf
 | Cambios en productos no se ven en la tienda | Revalidación de Next.js | Verificar `FLUX_REVALIDATE_SECRET` = `REVALIDATE_SECRET` |
 | Permisos de archivos en `storage/` (Linux) | UID distinto entre tu usuario y el contenedor | `UID=$(id -u) GID=$(id -g) docker compose build app` |
 | Puerto 5432, 3000 u 8000 ocupado | Otro servicio local | Cambiar `DB_FORWARD_PORT`, `STOREFRONT_PORT` o `BACKEND_PORT` al ejecutar compose |
+| Con Webuzo, el dominio muestra la página por defecto de Webuzo | Falta el archivo de proxy del dominio o no se reinició el servidor web | Revisar el paso 6 de la sección 6.7 |
+| Con Webuzo, error 502/503 en el dominio | Los contenedores de Flux no están corriendo | `docker compose -f compose.prod.yml --env-file .env ps` |
+| Con Webuzo, error al subir imágenes grandes | Límite de tamaño del proxy | Aumentar `client_max_body_size` (Nginx) o `LimitRequestBody` (Apache) |

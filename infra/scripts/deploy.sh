@@ -15,8 +15,8 @@ echo "==> Respaldo previo"
 echo "==> Construyendo imágenes ${FLUX_VERSION:-latest}"
 $COMPOSE build
 
-echo "==> Levantando base de datos y Redis"
-$COMPOSE up -d postgres redis meilisearch
+echo "==> Levantando base de datos"
+$COMPOSE up -d postgres
 
 echo "==> Migraciones"
 $COMPOSE run --rm app php artisan migrate --force

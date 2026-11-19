@@ -22,7 +22,7 @@ paths:
                   status: { type: string, enum: [ok] }
   /health/ready:
     get:
-      summary: Readiness (base de datos, caché y scheduler)
+      summary: Readiness (base de datos, caché, scheduler y worker)
       responses:
         "200":
           description: Listo (ok) o degradado (scheduler sin latido)
@@ -60,6 +60,7 @@ components:
             database: { type: string, enum: [ok, fail] }
             cache: { type: string, enum: [ok, fail] }
             scheduler: { type: string, enum: [ok, stale] }
+            worker: { type: string, enum: [ok, stale] }
         version: { type: string }
     PublicStore:
       type: object

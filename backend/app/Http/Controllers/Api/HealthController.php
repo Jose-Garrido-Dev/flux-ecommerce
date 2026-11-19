@@ -29,11 +29,14 @@ class HealthController extends Controller
             }),
         ];
 
-        $scheduler = SystemHeartbeat::query()->where('name', 'scheduler')->value('last_seen_at');
-        $checks['scheduler'] = $scheduler && now()->diffInMinutes($scheduler, true) <= 3 ? 'ok' : 'stale';
+        foreach (['scheduler', 'worker'] as $process) {
+            $seen = SystemHeartbeat::query()->where('name', $process)->value('last_seen_at');
+            $checks[$process] = $seen && now()->diffInMinutes($seen, true) <= 3 ? 'ok' : 'stale';
+        }
 
         $critical = $checks['database'] === 'ok' && $checks['cache'] === 'ok';
-        $status = ! $critical ? 'fail' : ($checks['scheduler'] === 'ok' ? 'ok' : 'degraded');
+        $processesOk = $checks['scheduler'] === 'ok' && $checks['worker'] === 'ok';
+        $status = ! $critical ? 'fail' : ($processesOk ? 'ok' : 'degraded');
 
         return response()->json(
             ['status' => $status, 'checks' => $checks, 'version' => config('flux.version')],
