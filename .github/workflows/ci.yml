@@ -139,7 +139,7 @@ jobs:
         run: |
           set -x
           docker compose exec -T app php artisan flux:demo
-          curl -fsS "http://127.0.0.1:8000/api/storefront/v1/catalog/products?filter[color]=negro" | grep -q '"total":10'
+          curl -gfsS "http://127.0.0.1:8000/api/storefront/v1/catalog/products?filter[color]=negro" | grep -q '"total":10'
           # Imagen servida por Nginx desde storage y por la tienda en /media
           curl -fsS -o /dev/null -w "%{http_code} %{content_type}\n" http://127.0.0.1:8000/storage/demo/demo-polera-esencial-negro-a.jpg | grep -q "200 image/jpeg"
           for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:3000/media/demo/demo-polera-esencial-negro-a.jpg && break; sleep 3; done
