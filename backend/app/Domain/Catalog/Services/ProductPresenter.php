@@ -14,13 +14,16 @@ use App\Domain\Catalog\Models\VariantPrice;
  */
 class ProductPresenter
 {
-    public const CARD_RELATIONS = ['brand', 'media', 'variants.prices'];
+    public const CARD_RELATIONS = ['brand', 'media', 'variants.prices', 'variants.attributeValues.attribute'];
 
     public const DETAIL_RELATIONS = [
         'brand', 'media', 'primaryCategory', 'taxClass',
         'variants.prices', 'variants.image', 'variants.attributeValues.attribute',
         'attributeValues.attribute', 'attributeValues.value',
     ];
+
+    /** Días que un producto se marca como "Nuevo" desde su publicación. */
+    public const NEW_DAYS = 30;
 
     /** Etiquetas HTML permitidas en la descripción. Todo atributo se elimina. */
     private const ALLOWED_TAGS = ['p', 'br', 'strong', 'b', 'em', 'i', 'ul', 'ol', 'li', 'h3', 'h4', 'blockquote'];
@@ -39,6 +42,13 @@ class ProductPresenter
             'hover_image' => $images->get(1)?->toPublicArray($product->name),
             'price' => $this->priceRange($variants->all()),
             'featured' => $product->featured,
+            'is_new' => $product->published_at?->gt(now()->subDays(self::NEW_DAYS)) ?? false,
+            'swatches' => $variants
+                ->flatMap(fn (ProductVariant $v) => $v->attributeValues)
+                ->filter(fn ($val) => $val->attribute->display === 'swatch' && $val->color_hex)
+                ->unique('id')->sortBy('position')
+                ->map(fn ($val) => ['label' => $val->label, 'color_hex' => $val->color_hex])
+                ->values()->all(),
             'variant_count' => $variants->count(),
         ];
     }

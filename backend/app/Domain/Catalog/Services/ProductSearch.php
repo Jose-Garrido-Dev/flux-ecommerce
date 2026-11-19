@@ -101,6 +101,18 @@ class ProductSearch
             $query->where('featured', true);
         }
 
+        if ($criteria['on_sale'] ?? false) {
+            $now = now()->toDateTimeString();
+            $query->whereExists(fn (QueryBuilder $q) => $q->selectRaw('1')
+                ->from('product_variants as ov')
+                ->join('variant_prices as op', 'op.variant_id', '=', 'ov.id')
+                ->whereColumn('ov.product_id', 'products.id')
+                ->where('ov.status', 'active')
+                ->whereNotNull('op.sale_amount')
+                ->where(fn ($w) => $w->whereNull('op.sale_starts_at')->orWhere('op.sale_starts_at', '<=', $now))
+                ->where(fn ($w) => $w->whereNull('op.sale_ends_at')->orWhere('op.sale_ends_at', '>', $now)));
+        }
+
         if ($ids = $criteria['exclude_ids'] ?? []) {
             $query->whereNotIn('products.id', $ids);
         }

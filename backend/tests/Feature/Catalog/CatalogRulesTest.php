@@ -9,6 +9,7 @@ use App\Domain\Pricing\Models\TaxClass;
 use Database\Seeders\TaxClassSeeder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Tests\TestCase;
 
@@ -96,6 +97,7 @@ class CatalogRulesTest extends TestCase
 
     public function test_demo_command_refuses_production_and_cleans_up(): void
     {
+        Storage::fake('public');
         $this->seed(TaxClassSeeder::class);
 
         $this->app['env'] = 'production';
@@ -105,10 +107,12 @@ class CatalogRulesTest extends TestCase
         $this->app['env'] = 'local';
         $this->artisan('flux:demo')->assertSuccessful();
         $this->assertGreaterThan(10, Product::query()->count());
+        Storage::disk('public')->assertExists('demo/demo-polera-esencial-negro-a.jpg');
         $real = $this->product('Producto real', [['price' => 1000]]);
 
         $this->artisan('flux:demo --remove')->assertSuccessful();
         $this->assertSame([$real->id], Product::query()->pluck('id')->all());
         $this->assertSame(0, Category::query()->count());
+        $this->assertSame([], Storage::disk('public')->allFiles('demo'));
     }
 }

@@ -12,7 +12,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
 
   return (
     <Container className="py-10">
-      <h1 className="font-display text-4xl">{q ? `Resultados para “${q}”` : "Buscar"}</h1>
+      <h1 className="font-display text-5xl sm:text-7xl">{q ? `Resultados para “${q}”` : "Buscar"}</h1>
       <SearchForm id="q-pagina" defaultValue={q} className="mb-10 mt-6 max-w-xl" />
       {q && <CatalogView list={await listProducts(toApiQuery(params))} pathname="/buscar" params={params} />}
     </Container>

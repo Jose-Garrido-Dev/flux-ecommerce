@@ -2,47 +2,60 @@ import Link from "next/link";
 import type { CategoryNode, PublicStore } from "@/lib/types";
 import { Container } from "@/components/ui/Container";
 
+const SOCIAL_LABEL = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok" } as const;
+
 export function Footer({ store, menu }: { store: PublicStore | null; menu: CategoryNode[] }) {
   const year = new Date().getFullYear();
+  const name = store?.name ?? "Tienda";
+  const social = Object.entries(store?.social ?? {}) as [keyof typeof SOCIAL_LABEL, string][];
+
   return (
-    <footer className="mt-24 border-t border-border bg-subtle">
-      <Container className="grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="lg:col-span-2">
-          <p className="font-display text-2xl">{store?.name ?? "Tienda"}</p>
-          {store?.tagline && <p className="mt-3 max-w-sm text-muted">{store.tagline}</p>}
+    <footer className="relative mt-32 overflow-hidden bg-ink text-ink-fg">
+      <Container className="relative grid gap-12 pb-12 pt-20 md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr]">
+        <div>
+          <p className="font-display text-5xl leading-none sm:text-6xl">{name}</p>
+          {store?.tagline && <p className="mt-5 max-w-sm text-ink-muted">{store.tagline}</p>}
         </div>
         {menu.length > 0 && (
           <nav aria-label="Categorías">
-            <p className="label">Comprar</p>
-            <ul className="mt-4 space-y-2 text-sm">
+            <p className="text-sm font-semibold text-ink-muted">Comprar</p>
+            <ul className="mt-5 space-y-3">
+              <li>
+                <Link href="/catalogo" className="hover:underline underline-offset-4">Todo el catálogo</Link>
+              </li>
               {menu.map((c) => (
                 <li key={c.slug}>
-                  <Link href={`/categoria/${c.slug}`} className="hover:underline underline-offset-4">
-                    {c.name}
-                  </Link>
+                  <Link href={`/categoria/${c.slug}`} className="hover:underline underline-offset-4">{c.name}</Link>
                 </li>
               ))}
             </ul>
           </nav>
         )}
-        {(store?.contact.email || store?.contact.phone) && (
+        {(store?.contact.email || store?.contact.phone || social.length > 0) && (
           <div>
-            <p className="label">Contacto</p>
-            <ul className="mt-4 space-y-2 text-sm">
-              {store.contact.email && (
-                <li>
-                  <a href={`mailto:${store.contact.email}`} className="hover:underline underline-offset-4">
-                    {store.contact.email}
-                  </a>
-                </li>
+            <p className="text-sm font-semibold text-ink-muted">Contacto</p>
+            <ul className="mt-5 space-y-3">
+              {store?.contact.email && (
+                <li><a href={`mailto:${store.contact.email}`} className="hover:underline underline-offset-4">{store.contact.email}</a></li>
               )}
-              {store.contact.phone && <li>{store.contact.phone}</li>}
+              {store?.contact.phone && <li>{store.contact.phone}</li>}
+              {social.map(([k, url]) => (
+                <li key={k}>
+                  <a href={url} rel="noopener noreferrer" target="_blank" className="hover:underline underline-offset-4">{SOCIAL_LABEL[k]}</a>
+                </li>
+              ))}
             </ul>
           </div>
         )}
       </Container>
-      <Container className="border-t border-border py-6 text-xs text-muted">
-        © {year} {store?.name ?? "Tienda"}. Precios en pesos chilenos con IVA incluido.
+      <Container className="relative">
+        <p aria-hidden className="select-none overflow-hidden whitespace-nowrap font-display text-[18vw] leading-[0.8] text-wordmark">
+          {name}
+        </p>
+      </Container>
+      <Container className="relative flex flex-wrap justify-between gap-4 border-t border-white/10 py-6 text-xs text-ink-muted">
+        <span>© {year} {name}</span>
+        <span>Precios en pesos chilenos con IVA incluido</span>
       </Container>
     </footer>
   );

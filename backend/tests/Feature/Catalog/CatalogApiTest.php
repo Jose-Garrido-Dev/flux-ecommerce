@@ -202,7 +202,27 @@ class CatalogApiTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data.featured')
             ->assertJsonCount(2, 'data.newest')
-            ->assertJsonStructure(['data' => ['categories', 'featured', 'newest', 'brands']]);
+            ->assertJsonCount(0, 'data.on_sale')
+            ->assertJsonStructure(['data' => ['categories', 'featured', 'newest', 'on_sale', 'brands']]);
+    }
+
+    public function test_home_on_sale_block_and_card_badges(): void
+    {
+        $color = $this->attribute('color', ['rojo']);
+        $color->update(['display' => 'swatch']);
+        $color->values()->update(['color_hex' => '#cc0000']);
+        $this->product('Oferta', [['price' => 1000, 'sale' => 800, 'options' => ['color' => 'rojo']]]);
+        $this->product('Antiguo', [['price' => 1000]], ['published_at' => now()->subDays(90)]);
+
+        $res = $this->getJson('/api/storefront/v1/home')->assertOk();
+
+        $res->assertJsonCount(1, 'data.on_sale')
+            ->assertJsonPath('data.on_sale.0.name', 'Oferta')
+            ->assertJsonPath('data.on_sale.0.is_new', true)
+            ->assertJsonPath('data.on_sale.0.swatches.0.label', 'Rojo');
+
+        $antiguo = collect($res->json('data.newest'))->firstWhere('name', 'Antiguo');
+        $this->assertFalse($antiguo['is_new']);
     }
 
     public function test_storefront_server_with_shared_secret_is_not_rate_limited(): void

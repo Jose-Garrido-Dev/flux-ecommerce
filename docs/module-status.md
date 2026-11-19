@@ -32,8 +32,8 @@ Un módulo pasa a "Validado" solo con evidencia enlazada (PR, ejecución de CI, 
 | 23 | Auditoría | 1 | En desarrollo | Tabla y servicio de auditoría |
 | 24 | Configuraciones generales | 1 | En desarrollo | Pestaña "Negocio" |
 | 25 | Manuales de uso | 1 | Pendiente | |
-| 26 | Storefront público | 2 | Implementado | Portada, catálogo con filtros, categoría, marca, búsqueda y ficha. Lighthouse móvil 96–100 y axe sin errores (claro y oscuro). Carrito en la Fase 5 |
-| 27 | Experiencia visual y animaciones | 2 | En desarrollo | Design system con tokens y tema Minimalista; transiciones CSS que respetan movimiento reducido. Motion y temas adicionales en la Fase 9 |
+| 26 | Storefront público | 2 | Implementado | Portada con hero animado, mosaico de categorías, carrusel de destacados, bloque de ofertas con cuenta regresiva real y cintas de categorías y marcas; menú desplegable con imagen; catálogo con filtros, categoría, marca, búsqueda y ficha con zoom. Lighthouse móvil 90–96 en rendimiento y 100 en accesibilidad, buenas prácticas y SEO; axe sin errores (claro y oscuro, escritorio y móvil). Carrito en la Fase 5 |
+| 27 | Experiencia visual y animaciones | 2 | En desarrollo | Tema "Lapislázuli" con tokens y modo oscuro; titular animado por palabras, parallax, aparición al hacer scroll, transición entre páginas, zoom de imagen, cintas en movimiento. Todo en CSS (sin librerías de animación) y desactivado con movimiento reducido. Editor de temas en la Fase 9 |
 | 28 | Devoluciones y reembolsos | 8 | Pendiente | |
 | 29 | Configuración técnica y operaciones | 1 | En desarrollo | Docker, health checks, respaldos, CI |
 | 30 | Reutilización comercial Flux | 15 | Pendiente | |

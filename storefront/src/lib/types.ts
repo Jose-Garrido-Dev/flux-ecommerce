@@ -5,7 +5,9 @@ export type PublicStore = {
   tagline: string | null;
   currency: string;
   locale: string;
+  announcements: string[];
   contact: { email: string | null; phone: string | null };
+  social: Partial<Record<"instagram" | "facebook" | "tiktok", string>>;
 };
 
 export type Image = { path: string; alt: string; width: number | null; height: number | null };
@@ -28,6 +30,8 @@ export type ProductCard = {
   hover_image: Image | null;
   price: Price | null;
   featured: boolean;
+  is_new: boolean;
+  swatches: { label: string; color_hex: string }[];
   variant_count: number;
 };
 
@@ -92,5 +96,6 @@ export type HomeData = {
   categories: { name: string; slug: string; image: Image | null }[];
   featured: ProductCard[];
   newest: ProductCard[];
+  on_sale: ProductCard[];
   brands: BrandCard[];
 };

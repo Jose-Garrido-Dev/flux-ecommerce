@@ -89,7 +89,7 @@ export default async function ProductPage({ params }: Props) {
       </Container>
       {related.length > 0 && (
         <Container className="py-16">
-          <h2 className="mb-8 font-display text-3xl">También te puede gustar</h2>
+          <h2 className="mb-8 font-display text-5xl">También te puede gustar</h2>
           <ProductGrid products={related.slice(0, 4)} />
         </Container>
       )}

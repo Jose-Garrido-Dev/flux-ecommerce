@@ -28,7 +28,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
     <Container className="py-10">
       <Breadcrumbs items={[{ name: "Inicio", href: "/" }, { name: "Marcas" }, { name: brand.name }]} />
       <header className="mb-10 mt-4">
-        <h1 className="font-display text-4xl">{brand.name}</h1>
+        <h1 className="font-display text-6xl sm:text-8xl">{brand.name}</h1>
         {brand.description && <p className="mt-3 max-w-2xl text-muted">{brand.description}</p>}
       </header>
       <CatalogView list={list} pathname={`/marca/${slug}`} params={query} />

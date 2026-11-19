@@ -13,7 +13,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   return (
     <Container className="py-10">
       <Breadcrumbs items={[{ name: "Inicio", href: "/" }, { name: "Catálogo" }]} />
-      <h1 className="mb-10 mt-4 font-display text-4xl">Catálogo</h1>
+      <h1 className="mb-12 mt-5 font-display text-6xl sm:text-8xl">Catálogo</h1>
       <CatalogView list={list} pathname="/catalogo" params={params} />
     </Container>
   );

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Flux Storefront API
-  version: 0.2.0
+  version: 0.3.0
   description: >
     Contrato entre el backend Laravel y el storefront Next.js.
     Todo endpoint nuevo se agrega aquí antes de implementarse.
@@ -65,6 +65,7 @@ paths:
                       categories: { type: array, items: { $ref: "#/components/schemas/CategoryCard" } }
                       featured: { type: array, items: { $ref: "#/components/schemas/ProductCard" } }
                       newest: { type: array, items: { $ref: "#/components/schemas/ProductCard" } }
+                      on_sale: { type: array, items: { $ref: "#/components/schemas/ProductCard" }, description: Productos con una oferta vigente }
                       brands: { type: array, items: { $ref: "#/components/schemas/BrandCard" } }
   /storefront/v1/catalog/products:
     get:
@@ -75,6 +76,7 @@ paths:
         - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: Busca en nombre, descripción corta, marca y SKU }
         - { name: sort, in: query, schema: { type: string, enum: [relevance, newest, price_asc, price_desc, name] } }
         - { name: featured, in: query, schema: { type: boolean } }
+        - { name: on_sale, in: query, schema: { type: boolean }, description: Solo productos con una oferta vigente }
         - { name: min_price, in: query, schema: { type: integer, minimum: 0 }, description: Precio vigente con IVA, en CLP }
         - { name: max_price, in: query, schema: { type: integer, minimum: 0 } }
         - name: filter
@@ -193,6 +195,14 @@ components:
           properties:
             email: { type: [string, "null"] }
             phone: { type: [string, "null"] }
+        announcements: { type: array, items: { type: string }, description: "Mensajes de la barra de anuncios (configurados en el panel, separados por |)" }
+        social:
+          type: object
+          description: Solo las redes configuradas
+          properties:
+            instagram: { type: string, format: uri }
+            facebook: { type: string, format: uri }
+            tiktok: { type: string, format: uri }
     Problem:
       type: object
       description: RFC 9457 (application/problem+json)
@@ -231,6 +241,8 @@ components:
         hover_image: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
         price: { oneOf: [{ $ref: "#/components/schemas/Price" }, { type: "null" }] }
         featured: { type: boolean }
+        is_new: { type: boolean, description: Publicado en los últimos 30 días }
+        swatches: { type: array, items: { type: object, properties: { label: { type: string }, color_hex: { type: string } } }, description: Colores disponibles en variantes activas }
         variant_count: { type: integer }
     ProductDetail:
       allOf:

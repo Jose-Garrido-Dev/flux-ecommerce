@@ -18,10 +18,15 @@ class StoreController extends Controller
             'tagline' => $business['tagline'] ?? null,
             'currency' => 'CLP',
             'locale' => 'es-CL',
+            'announcements' => collect(explode('|', (string) ($business['announcement'] ?? '')))
+                ->map(fn ($m) => trim($m))->filter()->values()->all(),
             'contact' => [
                 'email' => $business['contact_email'] ?? null,
                 'phone' => $business['contact_phone'] ?? null,
             ],
+            'social' => collect(['instagram', 'facebook', 'tiktok'])
+                ->mapWithKeys(fn ($k) => [$k => $business[$k] ?? null])
+                ->filter()->all(),
         ]]);
     }
 }

@@ -4,7 +4,7 @@ import type { CategoryNode, ProductList, PublicStore } from "./types";
 
 export type SearchParams = Record<string, string | string[] | undefined>;
 
-const ALLOWED = ["q", "sort", "page", "min_price", "max_price"] as const;
+const ALLOWED = ["q", "sort", "page", "min_price", "max_price", "on_sale"] as const;
 
 /** Traduce los parámetros de la URL de la tienda a la consulta de la API. */
 export function toApiQuery(params: SearchParams, fixed: Record<string, string> = {}): string {

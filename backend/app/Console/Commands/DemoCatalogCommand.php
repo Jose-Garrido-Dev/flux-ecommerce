@@ -29,9 +29,10 @@ class DemoCatalogCommand extends Command
 
     protected $description = 'Crea (o elimina) un catálogo de demostración. Solo desarrollo.';
 
+    // Debe coincidir con infra/demo-art/generate.js
     private const PALETTE = [
-        'negro' => ['Negro', '#1f1f1f'], 'blanco' => ['Blanco', '#f5f5f2'], 'arena' => ['Arena', '#d8c7a8'],
-        'oliva' => ['Oliva', '#6b7046'], 'azul' => ['Azul marino', '#23324d'], 'terracota' => ['Terracota', '#b5603d'],
+        'negro' => ['Negro', '#26262a'], 'blanco' => ['Blanco', '#eeece6'], 'arena' => ['Arena', '#cdb48f'],
+        'oliva' => ['Oliva', '#6e7447'], 'azul' => ['Azul marino', '#283a5c'], 'terracota' => ['Terracota', '#b2593a'],
     ];
 
     public function handle(): int
@@ -121,7 +122,7 @@ class DemoCatalogCommand extends Command
                 'name' => $parentName, 'slug' => 'demo-'.Str::slug($parentName),
                 'position' => $p++, 'on_home' => true,
                 'description' => "Selección de $parentName de demostración.",
-                'image_media_id' => $this->image("cat-$parentName", 1200, 900)->id,
+                'image_media_id' => $this->image('cat-'.Str::slug($parentName))->id,
             ]);
             foreach ($children as $i => $childName) {
                 $leaf[$childName] = Category::query()->create([
@@ -174,9 +175,8 @@ class DemoCatalogCommand extends Command
 
             $vpos = 0;
             foreach ($productColors as $ci => $colorKey) {
-                $hex = self::PALETTE[$colorKey][1];
-                $front = $this->image("$slug-$colorKey-a", 1200, 1500, $hex);
-                $back = $this->image("$slug-$colorKey-b", 1200, 1500, $hex, true);
+                $front = $this->image("$slug-$colorKey-a", $name);
+                $back = $this->image("$slug-$colorKey-b", $name);
                 $product->media()->attach($front->id, ['position' => $ci * 2, 'is_primary' => $ci === 0]);
                 $product->media()->attach($back->id, ['position' => $ci * 2 + 1, 'is_primary' => false]);
 
@@ -224,40 +224,22 @@ class DemoCatalogCommand extends Command
         });
     }
 
-    /** Imagen abstracta generada con GD (sin descargar nada de internet). */
-    private function image(string $name, int $w, int $h, ?string $accent = null, bool $alt = false): Media
+    /**
+     * Copia una imagen de demostración ya generada (database/demo/images, ver
+     * infra/demo-art/generate.js) al disco público. No descarga nada de internet.
+     */
+    private function image(string $name, ?string $alt = null): Media
     {
-        $img = imagecreatetruecolor($w, $h);
-        $seed = crc32($name);
-        $bg = [240 - ($seed % 12), 236 - ($seed % 10), 228 - ($seed % 14)];
-        imagefilledrectangle($img, 0, 0, $w, $h, imagecolorallocate($img, ...$bg));
+        $source = database_path("demo/images/$name.jpg");
+        $bytes = file_get_contents($source);
+        [$width, $height] = getimagesizefromstring($bytes);
 
-        [$r, $g, $b] = sscanf($accent ?? sprintf('#%06x', $seed & 0x7F7F7F), '#%02x%02x%02x');
-        $main = imagecolorallocate($img, $r, $g, $b);
-        $shade = imagecolorallocate($img, (int) ($r * 0.8), (int) ($g * 0.8), (int) ($b * 0.8));
-        $soft = imagecolorallocatealpha($img, $r, $g, $b, 100);
-
-        if ($alt) {
-            imagefilledellipse($img, (int) ($w * 0.5), (int) ($h * 0.52), (int) ($w * 0.78), (int) ($w * 0.78), $soft);
-            imagefilledrectangle($img, (int) ($w * 0.3), (int) ($h * 0.3), (int) ($w * 0.7), (int) ($h * 0.74), $main);
-            imagefilledrectangle($img, (int) ($w * 0.3), (int) ($h * 0.66), (int) ($w * 0.7), (int) ($h * 0.74), $shade);
-        } else {
-            imagefilledellipse($img, (int) ($w * 0.5), (int) ($h * 0.86), (int) ($w * 0.7), (int) ($h * 0.06), imagecolorallocatealpha($img, 0, 0, 0, 105));
-            imagefilledrectangle($img, (int) ($w * 0.26), (int) ($h * 0.22), (int) ($w * 0.74), (int) ($h * 0.82), $main);
-            imagefilledrectangle($img, (int) ($w * 0.26), (int) ($h * 0.22), (int) ($w * 0.74), (int) ($h * 0.3), $shade);
-        }
-
-        ob_start();
-        imagejpeg($img, null, 82);
-        $bytes = ob_get_clean();
-        imagedestroy($img);
-
-        $path = 'demo/'.Str::slug($name).'.jpg';
+        $path = "demo/$name.jpg";
         Storage::disk('public')->put($path, $bytes);
 
         return Media::query()->create([
             'disk' => 'public', 'path' => $path, 'mime' => 'image/jpeg', 'size' => strlen($bytes),
-            'width' => $w, 'height' => $h, 'checksum' => hash('sha256', $bytes),
+            'width' => $width, 'height' => $height, 'checksum' => hash('sha256', $bytes), 'alt' => $alt,
         ]);
     }
 }

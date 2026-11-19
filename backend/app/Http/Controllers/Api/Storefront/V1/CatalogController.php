@@ -28,6 +28,7 @@ class CatalogController extends Controller
             'q' => ['nullable', 'string', 'max:100'],
             'sort' => ['nullable', Rule::in(ProductSearch::SORTS)],
             'featured' => ['nullable', 'boolean'],
+            'on_sale' => ['nullable', 'boolean'],
             'min_price' => ['nullable', 'integer', 'min:0'],
             'max_price' => ['nullable', 'integer', 'min:0'],
             'filter' => ['nullable', 'array', 'max:10'],
@@ -54,6 +55,7 @@ class CatalogController extends Controller
             'q' => $input['q'] ?? null,
             'sort' => $input['sort'] ?? null,
             'featured' => (bool) ($input['featured'] ?? false),
+            'on_sale' => (bool) ($input['on_sale'] ?? false),
             'min_price' => isset($input['min_price']) ? (int) $input['min_price'] : null,
             'max_price' => isset($input['max_price']) ? (int) $input['max_price'] : null,
             // filter[color]=rojo,azul
@@ -166,6 +168,7 @@ class CatalogController extends Controller
                 ->map(fn (Category $c) => $this->categoryCard($c))->all(),
             'featured' => collect($this->search->search(['featured' => true, 'per_page' => 8])->items())->map($card)->all(),
             'newest' => collect($this->search->search(['sort' => 'newest', 'per_page' => 8])->items())->map($card)->all(),
+            'on_sale' => collect($this->search->search(['on_sale' => true, 'per_page' => 8])->items())->map($card)->all(),
             'brands' => Brand::query()->active()->where('show_on_home', true)->with('logo')
                 ->orderBy('position')->limit(12)->get()
                 ->map(fn (Brand $b) => $this->brandCard($b))->all(),

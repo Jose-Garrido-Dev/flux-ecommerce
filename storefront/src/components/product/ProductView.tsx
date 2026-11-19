@@ -47,9 +47,33 @@ export function ProductView({ product }: { product: ProductDetail }) {
   const current = images[imageIndex] ?? images[0];
 
   return (
-    <div className="grid gap-10 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
-      <div className="space-y-3">
-        <div className="relative aspect-[4/5] overflow-hidden rounded-[var(--radius)] bg-subtle">
+    <div className="grid gap-10 lg:grid-cols-[1.25fr_1fr] lg:gap-20">
+      <div className="flex flex-col-reverse gap-3 lg:flex-row">
+        {images.length > 1 && (
+          <ul className="no-scrollbar flex gap-2 overflow-x-auto lg:max-h-[calc(100svh-8rem)] lg:w-20 lg:flex-col lg:overflow-y-auto" aria-label="Imágenes del producto">
+            {images.map((img, i) => (
+              <li key={img.path} className="w-16 shrink-0 lg:w-full">
+                <button
+                  type="button"
+                  onClick={() => setImageIndex(i)}
+                  aria-label={`Ver imagen ${i + 1} de ${images.length}`}
+                  aria-current={i === imageIndex}
+                  className={`relative block aspect-[4/5] w-full overflow-hidden rounded-[var(--radius-sm)] bg-subtle transition ${i === imageIndex ? "ring-2 ring-fg ring-offset-2 ring-offset-bg" : "opacity-70 hover:opacity-100"}`}
+                >
+                  <Image src={mediaUrl(img.path)} alt="" fill sizes="80px" className="object-cover" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div
+          className="group/zoom relative aspect-[4/5] flex-1 cursor-zoom-in overflow-hidden rounded-[var(--radius)] bg-subtle"
+          onMouseMove={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            e.currentTarget.style.setProperty("--zx", `${((e.clientX - r.left) / r.width) * 100}%`);
+            e.currentTarget.style.setProperty("--zy", `${((e.clientY - r.top) / r.height) * 100}%`);
+          }}
+        >
           {current ? (
             <Image
               key={current.path}
@@ -57,35 +81,23 @@ export function ProductView({ product }: { product: ProductDetail }) {
               alt={current.alt}
               fill
               priority
-              sizes="(min-width: 1024px) 55vw, 100vw"
-              className="object-cover"
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              className="object-cover transition-transform duration-[var(--motion)] [transform-origin:var(--zx,50%)_var(--zy,50%)] group-hover/zoom:scale-[1.6] motion-reduce:group-hover/zoom:scale-100"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-muted">Sin imagen</div>
           )}
+          {product.price?.discount_percent ? (
+            <span className="absolute left-4 top-4 rounded-full bg-sale px-3 py-1.5 text-xs font-semibold text-bg">
+              -{product.price.discount_percent}%
+            </span>
+          ) : null}
         </div>
-        {images.length > 1 && (
-          <ul className="grid grid-cols-5 gap-2 sm:grid-cols-6" aria-label="Imágenes del producto">
-            {images.map((img, i) => (
-              <li key={img.path}>
-                <button
-                  type="button"
-                  onClick={() => setImageIndex(i)}
-                  aria-label={`Ver imagen ${i + 1} de ${images.length}`}
-                  aria-current={i === imageIndex}
-                  className={`relative block aspect-square w-full overflow-hidden rounded-[var(--radius-sm)] bg-subtle ring-offset-2 ring-offset-bg ${i === imageIndex ? "ring-2 ring-fg" : "opacity-80 hover:opacity-100"}`}
-                >
-                  <Image src={mediaUrl(img.path)} alt="" fill sizes="96px" className="object-cover" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
 
-      <div className="lg:sticky lg:top-24 lg:self-start">
+      <div className="pb-20 lg:sticky lg:top-28 lg:self-start lg:pb-0">
         {product.brand && <p className="label">{product.brand.name}</p>}
-        <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">{product.name}</h1>
+        <h1 className="mt-2 font-display text-5xl sm:text-6xl">{product.name}</h1>
         <div className="mt-4">
           <Price price={variant?.price ?? null} size="lg" />
           <p className="mt-1 text-xs text-muted">{product.tax.label}</p>
@@ -144,34 +156,54 @@ export function ProductView({ product }: { product: ProductDetail }) {
           ))}
         </div>
 
-        <div className="mt-8">
-          <button type="button" disabled className={buttonClass("primary", "w-full")}>
+        <div className="mt-10">
+          <button type="button" disabled className={buttonClass("primary", "h-14 w-full text-base")}>
             Agregar al carrito
           </button>
-          <p className="mt-2 text-center text-xs text-muted">La compra en línea se habilita próximamente.</p>
-          {variant && <p className="mt-6 text-xs text-muted">SKU: {variant.sku}</p>}
+          <p className="mt-3 text-center text-xs text-muted">La compra en línea se habilita próximamente.</p>
         </div>
 
-        {product.description_html && (
-          <section className="mt-10 border-t border-border pt-8">
-            <h2 className="label">Descripción</h2>
-            <div className="prose-flux mt-4 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: product.description_html }} />
-          </section>
-        )}
+        {/* Barra fija en móvil con precio y acción */}
+        <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-4 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur lg:hidden">
+          <Price price={variant?.price ?? null} />
+          <button type="button" disabled className={buttonClass("primary", "h-11 px-5")}>
+            Agregar al carrito
+          </button>
+        </div>
 
-        {product.specifications.length > 0 && (
-          <section className="mt-8 border-t border-border pt-8">
-            <h2 className="label">Características</h2>
-            <dl className="mt-4 divide-y divide-border text-sm">
-              {product.specifications.map((s) => (
-                <div key={s.name} className="flex justify-between gap-4 py-2">
-                  <dt className="text-muted">{s.name}</dt>
-                  <dd>{s.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-        )}
+        <div className="mt-10 divide-y divide-border border-y border-border">
+          {product.description_html && (
+            <details className="group/acc" open>
+              <summary className="flex cursor-pointer list-none items-center justify-between py-5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                Descripción
+                <span aria-hidden className="text-lg transition-transform group-open/acc:rotate-45">+</span>
+              </summary>
+              <div className="prose-flux pb-6 text-sm leading-relaxed text-muted" dangerouslySetInnerHTML={{ __html: product.description_html }} />
+            </details>
+          )}
+          {product.specifications.length > 0 && (
+            <details className="group/acc">
+              <summary className="flex cursor-pointer list-none items-center justify-between py-5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                Características
+                <span aria-hidden className="text-lg transition-transform group-open/acc:rotate-45">+</span>
+              </summary>
+              <dl className="divide-y divide-border pb-4 text-sm">
+                {product.specifications.map((s) => (
+                  <div key={s.name} className="flex justify-between gap-4 py-2.5">
+                    <dt className="text-muted">{s.name}</dt>
+                    <dd>{s.value}</dd>
+                  </div>
+                ))}
+                {variant && (
+                  <div className="flex justify-between gap-4 py-2.5">
+                    <dt className="text-muted">SKU</dt>
+                    <dd className="tabular-nums">{variant.sku}</dd>
+                  </div>
+                )}
+              </dl>
+            </details>
+          )}
+        </div>
       </div>
     </div>
   );
