@@ -339,6 +339,32 @@ class InventoryService
             ->sum(fn ($l) => max(0, $l->on_hand - $l->reserved));
     }
 
+    /** Cantidad desde la cual la tienda muestra "últimas unidades" si la variante no tiene stock mínimo propio. */
+    public const LOW_STOCK_FALLBACK = 3;
+
+    /**
+     * Estado de stock para la tienda: in_stock, low_stock, out_of_stock o backorder (se vende sin stock).
+     * La cantidad exacta solo se informa cuando quedan pocas unidades.
+     *
+     * @return array{availability: string, quantity: ?int}
+     */
+    public function stockStatus(ProductVariant $variant): array
+    {
+        $available = $this->available($variant);
+        if ($available === null) {
+            return ['availability' => 'in_stock', 'quantity' => null];
+        }
+        $item = $variant->relationLoaded('inventoryItem') ? $variant->inventoryItem : $variant->inventoryItem()->first();
+        if ($available <= 0) {
+            return ['availability' => $item?->allow_backorder ? 'backorder' : 'out_of_stock', 'quantity' => 0];
+        }
+        $threshold = max((int) $item?->min_stock, self::LOW_STOCK_FALLBACK);
+
+        return $available <= $threshold
+            ? ['availability' => 'low_stock', 'quantity' => $available]
+            : ['availability' => 'in_stock', 'quantity' => null];
+    }
+
     // ---------------------------------------------------------------- Internos
 
     private function lockLevel(ProductVariant|int $variant, Warehouse|int $warehouse): InventoryLevel

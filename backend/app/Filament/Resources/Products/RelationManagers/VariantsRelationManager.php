@@ -33,7 +33,6 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema as DbSchema;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -272,8 +271,8 @@ class VariantsRelationManager extends RelationManager
 
     private function deletionBlocker(ProductVariant $variant): ?string
     {
-        if (DbSchema::hasTable('order_items') && DB::table('order_items')->where('variant_id', $variant->id)->exists()) {
-            return 'Tiene pedidos asociados. Desactívala en lugar de eliminarla.';
+        if ($reason = app(ProductWriter::class)->variantDeletionBlocker($variant)) {
+            return $reason;
         }
         if ($variant->product->variants()->count() === 1) {
             return 'Es la única variante del producto.';

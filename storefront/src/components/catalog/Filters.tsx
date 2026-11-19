@@ -17,12 +17,25 @@ function toggleHref(pathname: string, params: SearchParams, code: string, value:
 
 /** Filtros facetados con enlaces normales: funcionan sin JavaScript y se pueden compartir. */
 export function Filters({ facets, pathname, params }: { facets: Facet[]; pathname: string; params: SearchParams }) {
-  if (facets.length === 0) return null;
+  const onlyAvailable = params.in_stock === "1";
+  const stockHref = (() => {
+    const next = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (typeof v === "string" && v !== "" && k !== "in_stock" && k !== "page") next.set(k, v);
+    if (!onlyAvailable) next.set("in_stock", "1");
+    const qs = next.toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  })();
 
   const active = facets.flatMap((f) => f.values.filter((v) => v.selected).map((v) => ({ facet: f, value: v })));
 
   return (
     <div className="space-y-8">
+      <Link href={stockHref} className="flex items-center gap-3 text-sm" role="switch" aria-checked={onlyAvailable}>
+        <span aria-hidden className={`relative h-5 w-9 rounded-full transition-colors ${onlyAvailable ? "bg-fg" : "bg-border"}`}>
+          <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-bg transition-all ${onlyAvailable ? "left-[1.125rem]" : "left-0.5"}`} />
+        </span>
+        Solo productos disponibles
+      </Link>
       {active.length > 0 && (
         <div>
           <p className="label">Filtros activos</p>

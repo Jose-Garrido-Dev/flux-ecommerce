@@ -2,6 +2,7 @@
 
 namespace App\Domain\Catalog\Services;
 
+use App\Domain\Inventory\Services\InventoryService;
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\Media;
 use App\Domain\Catalog\Models\Product;
@@ -14,11 +15,12 @@ use App\Domain\Catalog\Models\VariantPrice;
  */
 class ProductPresenter
 {
-    public const CARD_RELATIONS = ['brand', 'media', 'variants.prices', 'variants.attributeValues.attribute'];
+    public const CARD_RELATIONS = ['brand', 'media', 'variants.prices', 'variants.attributeValues.attribute', 'variants.inventoryItem', 'variants.levels.warehouse'];
 
     public const DETAIL_RELATIONS = [
         'brand', 'media', 'primaryCategory', 'taxClass',
         'variants.prices', 'variants.image', 'variants.attributeValues.attribute',
+        'variants.inventoryItem', 'variants.levels.warehouse',
         'attributeValues.attribute', 'attributeValues.value',
     ];
 
@@ -27,6 +29,11 @@ class ProductPresenter
 
     /** Etiquetas HTML permitidas en la descripción. Todo atributo se elimina. */
     private const ALLOWED_TAGS = ['p', 'br', 'strong', 'b', 'em', 'i', 'ul', 'ol', 'li', 'h3', 'h4', 'blockquote'];
+
+    private function inventory(): InventoryService
+    {
+        return app(InventoryService::class);
+    }
 
     public function card(Product $product): array
     {
@@ -50,6 +57,7 @@ class ProductPresenter
                 ->map(fn ($val) => ['label' => $val->label, 'color_hex' => $val->color_hex])
                 ->values()->all(),
             'variant_count' => $variants->count(),
+            'in_stock' => $variants->contains(fn (ProductVariant $v) => $this->inventory()->stockStatus($v)['availability'] !== 'out_of_stock'),
         ];
     }
 
@@ -79,6 +87,7 @@ class ProductPresenter
                     ->all(),
                 'price' => $this->price($v->priceIn('CLP')),
                 'image' => $v->image?->toPublicArray($product->name),
+                'stock' => $this->inventory()->stockStatus($v),
             ])->all(),
             'specifications' => $product->attributeValues
                 ->filter(fn ($pav) => $pav->attribute?->visible_in_catalog)

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import type { ProductDetail, Variant } from "@/lib/types";
+import type { StockStatus, ProductDetail, Variant } from "@/lib/types";
 import { mediaUrl } from "@/lib/format";
 import { Price } from "@/components/ui/Price";
 import { buttonClass } from "@/components/ui/Button";
@@ -28,6 +28,14 @@ export function ProductView({ product }: { product: ProductDetail }) {
     product.variants.some((v) =>
       product.options.every((axis) => (axis.code === code ? v.options[code] === value : v.options[axis.code] === selected[axis.code])),
     );
+
+  /** La combinación con este valor (y lo ya elegido en los otros ejes) existe pero está agotada. */
+  const isSoldOut = (code: string, value: string) => {
+    const match = product.variants.find((v) =>
+      product.options.every((axis) => (axis.code === code ? v.options[code] === value : v.options[axis.code] === selected[axis.code])),
+    );
+    return match?.stock?.availability === "out_of_stock";
+  };
 
   const choose = (code: string, value: string) => {
     let next = { ...selected, [code]: value };
@@ -126,6 +134,7 @@ export function ProductView({ product }: { product: ProductDetail }) {
                 {axis.values.map((v) => {
                   const active = selected[axis.code] === v.value;
                   const available = isAvailable(axis.code, v.value);
+                  const soldOut = isSoldOut(axis.code, v.value);
                   const common = `transition-colors duration-[var(--motion-fast)] ${available ? "" : "opacity-40"}`;
                   return axis.display === "swatch" && v.color_hex ? (
                     <button
@@ -133,10 +142,11 @@ export function ProductView({ product }: { product: ProductDetail }) {
                       type="button"
                       onClick={() => choose(axis.code, v.value)}
                       aria-pressed={active}
-                      aria-label={`${v.label}${available ? "" : " (otra combinación)"}`}
+                      aria-label={`${v.label}${soldOut ? " (agotado)" : available ? "" : " (otra combinación)"}`}
                       title={v.label}
-                      className={`flex h-10 w-10 items-center justify-center rounded-full border ${active ? "border-fg ring-2 ring-fg ring-offset-2 ring-offset-bg" : "border-border"} ${common}`}
+                      className={`relative flex h-10 w-10 items-center justify-center rounded-full border ${active ? "border-fg ring-2 ring-fg ring-offset-2 ring-offset-bg" : "border-border"} ${common}`}
                     >
+                      {soldOut && <span aria-hidden className="sold-out-slash" />}
                       <span className="h-7 w-7 rounded-full border border-black/10" style={{ background: v.color_hex }} />
                     </button>
                   ) : (
@@ -145,9 +155,10 @@ export function ProductView({ product }: { product: ProductDetail }) {
                       type="button"
                       onClick={() => choose(axis.code, v.value)}
                       aria-pressed={active}
-                      className={`h-10 min-w-12 rounded-full border px-4 text-sm ${active ? "border-fg bg-fg text-bg" : "border-border hover:border-fg"} ${common}`}
+                      className={`h-10 min-w-12 rounded-full border px-4 text-sm ${active ? "border-fg bg-fg text-bg" : "border-border hover:border-fg"} ${soldOut ? "line-through" : ""} ${common}`}
                     >
                       {v.label}
+                      {soldOut && <span className="sr-only"> (agotado)</span>}
                     </button>
                   );
                 })}
@@ -157,8 +168,9 @@ export function ProductView({ product }: { product: ProductDetail }) {
         </div>
 
         <div className="mt-10">
+          <StockNote stock={variant?.stock} />
           <button type="button" disabled className={buttonClass("primary", "h-14 w-full text-base")}>
-            Agregar al carrito
+            {variant?.stock?.availability === "out_of_stock" ? "Agotado" : "Agregar al carrito"}
           </button>
           <p className="mt-3 text-center text-xs text-muted">La compra en línea se habilita próximamente.</p>
         </div>
@@ -167,7 +179,7 @@ export function ProductView({ product }: { product: ProductDetail }) {
         <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-4 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur lg:hidden">
           <Price price={variant?.price ?? null} />
           <button type="button" disabled className={buttonClass("primary", "h-11 px-5")}>
-            Agregar al carrito
+            {variant?.stock?.availability === "out_of_stock" ? "Agotado" : "Agregar al carrito"}
           </button>
         </div>
 
@@ -206,5 +218,28 @@ export function ProductView({ product }: { product: ProductDetail }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Aviso de disponibilidad de la variante elegida. */
+function StockNote({ stock }: { stock?: StockStatus }) {
+  if (!stock) return null;
+  const text = {
+    in_stock: "Disponible",
+    low_stock: stock.quantity === 1 ? "¡Última unidad!" : `¡Quedan ${stock.quantity} unidades!`,
+    out_of_stock: "Agotado por ahora",
+    backorder: "Disponible por encargo",
+  }[stock.availability];
+  const tone = {
+    in_stock: "bg-ok",
+    low_stock: "bg-sale",
+    out_of_stock: "bg-muted",
+    backorder: "bg-accent",
+  }[stock.availability];
+  return (
+    <p className="mb-4 flex items-center gap-2 text-sm font-medium" role="status">
+      <span aria-hidden className={`h-2 w-2 rounded-full ${tone}`} />
+      {text}
+    </p>
   );
 }

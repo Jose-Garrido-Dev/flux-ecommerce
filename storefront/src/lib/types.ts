@@ -33,7 +33,11 @@ export type ProductCard = {
   is_new: boolean;
   swatches: { label: string; color_hex: string }[];
   variant_count: number;
+  /** Ausente en respuestas de un backend anterior a la fase 4: se asume disponible. */
+  in_stock?: boolean;
 };
+
+export type StockStatus = { availability: "in_stock" | "low_stock" | "out_of_stock" | "backorder"; quantity: number | null };
 
 export type OptionAxis = {
   code: string;
@@ -48,6 +52,7 @@ export type Variant = {
   options: Record<string, string>;
   price: Price | null;
   image: Image | null;
+  stock?: StockStatus;
 };
 
 export type Crumb = { name: string; slug: string };

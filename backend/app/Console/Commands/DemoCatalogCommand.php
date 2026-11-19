@@ -10,6 +10,7 @@ use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\Media;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductVariant;
+use App\Domain\Inventory\Models\InventoryLevel;
 use App\Domain\Pricing\Models\TaxClass;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -203,6 +204,11 @@ class DemoCatalogCommand extends Command
                         'sale_ends_at' => $onSale ? now()->addDays(10) : null,
                         'compare_at_amount' => $i % 7 === 2 ? $amount + 5000 : null,
                     ]);
+
+                    // Stock de demostración directo en la bodega principal (sin movimientos, para poder borrarlo):
+                    // algunas variantes agotadas y otras con pocas unidades, para ver cada estado en la tienda
+                    $stock = ($vpos * 7 + $i * 3) % 13;
+                    InventoryLevel::query()->where('variant_id', $variant->id)->update(['on_hand' => $stock < 2 ? 0 : $stock]);
                 }
             }
         }

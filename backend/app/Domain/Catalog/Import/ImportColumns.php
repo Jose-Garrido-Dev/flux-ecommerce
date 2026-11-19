@@ -36,6 +36,9 @@ final class ImportColumns
         'length_mm' => ['largo_mm', 'Largo en milímetros.', false],
         'width_mm' => ['ancho_mm', 'Ancho en milímetros.', false],
         'height_mm' => ['alto_mm', 'Alto en milímetros.', false],
+        'stock' => ['stock', 'Unidades físicas en la bodega principal. Al actualizar, la diferencia se registra como ajuste de inventario.', false],
+        'min_stock' => ['stock_minimo', 'Bajo esta cantidad se alerta stock bajo.', false],
+        'track_stock' => ['controlar_stock', 'si o no. "no" = se vende sin límite de unidades. Vacío = si al crear.', false],
         'option1_name' => ['opcion1_nombre', 'Atributo de variante, por ejemplo Color.', false],
         'option1_value' => ['opcion1_valor', 'Valor, por ejemplo Negro.', false],
         'option2_name' => ['opcion2_nombre', 'Segundo atributo, por ejemplo Talla.', false],
@@ -60,6 +63,7 @@ final class ImportColumns
         'cost' => ['precio_costo', 'cost'],
         'barcode' => ['ean', 'upc', 'barcode', 'codigo_de_barras'],
         'weight_g' => ['peso', 'peso_gramos', 'weight'],
+        'stock' => ['existencias', 'cantidad', 'inventario', 'unidades'],
         'status' => ['status'],
         'tags' => ['tags'],
     ];

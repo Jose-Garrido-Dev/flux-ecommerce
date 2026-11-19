@@ -104,7 +104,7 @@ class VariantGenerator
             }
 
             if ($placeholder && $created > 0) {
-                $blocked = $this->writer->deletionBlocker($product);
+                $blocked = $this->writer->variantDeletionBlocker($placeholder);
                 if ($blocked) {
                     $placeholder->update(['is_default' => false, 'status' => 'inactive']);
                 } else {

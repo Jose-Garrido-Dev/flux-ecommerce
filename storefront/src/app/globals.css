@@ -17,6 +17,7 @@
   --color-accent: #1f3fd0;      /* lapislázuli */
   --color-accent-fg: #ffffff;
   --color-sale: #c2410c;        /* cobre (texto sobre claro) */
+  --color-ok: #15803d;          /* disponible */
   --color-hot: #ff8a4c;         /* cobre (sobre oscuro) */
   --color-border: #d9dcd4;
   --color-focus: #1f3fd0;
@@ -59,6 +60,7 @@
     --color-accent: #8ea2ff;
     --color-accent-fg: #080d22;
     --color-sale: #ff9a63;
+    --color-ok: #4ade80;
     --color-border: #232c52;
     --color-focus: #8ea2ff;
     --color-ink: #050918;
@@ -76,6 +78,7 @@
   --color-accent: var(--color-accent);
   --color-accent-fg: var(--color-accent-fg);
   --color-sale: var(--color-sale);
+  --color-ok: var(--color-ok);
   --color-hot: var(--color-hot);
   --color-field: var(--color-field);
   --color-field-fg: var(--color-field-fg);
@@ -197,3 +200,12 @@ body {
 /* Entrada sin opacidad (no retrasa el LCP): solo desplazamiento y escala */
 .rise { animation: rise 1.1s var(--ease-out) both; }
 @keyframes rise { from { transform: translateY(60px) scale(0.94); } to { transform: none; } }
+
+/* Variante agotada: línea diagonal sobre la muestra de color */
+.sold-out-slash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to top right, transparent calc(50% - 1px), var(--color-fg) calc(50% - 1px), var(--color-fg) calc(50% + 1px), transparent calc(50% + 1px));
+  border-radius: 9999px;
+}
