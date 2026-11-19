@@ -533,6 +533,16 @@ Cada push a GitHub ejecuta automáticamente estas verificaciones (`.github/workf
 
 Si ambas pasan, la tienda se construye y arranca en cualquier equipo con Docker, sin depender de nada instalado en la máquina.
 
+### 10.1 Todo en español
+
+Regla del proyecto: todo lo que ve una persona está en español, sin mezclar inglés. Eso incluye el panel, la tienda, las notificaciones, los mensajes de error y los correos. Hay tres revisiones automáticas:
+
+- `tests/Feature/Language/SpanishOnlyAdminTest.php` abre cada pantalla del panel con datos reales y falla si encuentra texto visible en inglés. Esto atrapa, por ejemplo, etiquetas que Filament genera a partir del nombre de un campo.
+- `SpanishOnlyModalsTest.php` abre los formularios de las acciones y envía formularios vacíos para revisar los mensajes de validación. `SpanishOnlyEmailsTest.php` revisa los correos y las páginas de error.
+- En la CI, `packages/qa/check-spanish.mjs` revisa las páginas de la tienda ya generadas: portada, catálogo, categoría, ficha, búsqueda y 404.
+
+La lista de palabras está en `packages/qa/palabras-ingles.json`. Si una palabra es válida en español (por ejemplo "stock"), se agrega a `permitidas`. Los textos fijos de Laravel, como los correos y las páginas de error, se traducen en `backend/lang/es.json`.
+
 ## 11. Problemas frecuentes
 
 | Síntoma | Causa probable | Solución |

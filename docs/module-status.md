@@ -7,7 +7,7 @@ Un módulo pasa a "Validado" solo con evidencia enlazada (PR, ejecución de CI, 
 
 | # | Módulo | Fase | Estado | Evidencia / nota |
 | --- | --- | --- | --- | --- |
-| 1 | Dashboard administrativo | 11 | Pendiente | |
+| 1 | Tablero de inicio | 11 | Pendiente | |
 | 2 | Gestión de productos | 3 | En desarrollo | Fase 3: panel con pestañas General, Precios, Especificaciones, Envío, SEO, Variantes, Imágenes y Relacionados. Duplicar, publicar, archivar, acciones masivas, exportar e importar CSV/Excel. Importación de 1.000 productos con informe de errores y bloqueo de borrado con pedidos probados. Pestaña de IA en la Fase 12; inventario en la Fase 4 |
 | 3 | Categorías | 3 | En desarrollo | Panel: árbol, orden arrastrando, imagen, banner, SEO, mover productos y borrado protegido. Los ciclos se rechazan en el formulario (prueba) |
 | 4 | Marcas | 3 | En desarrollo | Panel con logo, banner, SEO, archivado y borrado protegido. Nombre único sin importar mayúsculas ni tildes (prueba) |

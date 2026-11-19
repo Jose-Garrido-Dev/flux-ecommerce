@@ -4,6 +4,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ## [Sin publicar]
 
+### Corregido
+
+- Textos en inglés que se veían en el panel:
+  - La etiqueta "Attribute values" en la pestaña Especificaciones.
+  - Los nombres de modelos, acciones y resultados en Auditoría.
+  - Los nombres internos de los roles en Usuarios.
+  - "Dashboard" y "Open Graph".
+- Correos del sistema y páginas de error de Laravel traducidos (`lang/es.json`).
+- Revisiones automáticas para que no vuelva a aparecer texto en inglés en el panel, la tienda ni los correos (sección 10.1 de la guía).
+
 ### Agregado
 
 - Fase 3 (catálogo en el panel):
