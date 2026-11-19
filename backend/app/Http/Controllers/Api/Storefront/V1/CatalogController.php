@@ -93,7 +93,7 @@ class CatalogController extends Controller
         // Primero los elegidos a mano en el panel (pestaña Relacionados); se completa con la misma categoría
         $manual = Product::query()->visible()
             ->joinSub($product->relations()->getQuery()->select(['related_product_id', 'position']), 'rel', 'rel.related_product_id', '=', 'products.id')
-            ->orderBy('rel.position')->select('products.*')->distinct()
+            ->orderBy('rel.position')->select('products.*')
             ->with(ProductPresenter::CARD_RELATIONS)->limit(8)->get()->unique('id');
 
         $related = $manual;
