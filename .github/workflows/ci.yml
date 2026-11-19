@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (Laravel)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: flux_test
+          POSTGRES_USER: flux
+          POSTGRES_PASSWORD: flux
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U flux -d flux_test"
+          --health-interval 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: flux_test
+      DB_USERNAME: flux
+      DB_PASSWORD: flux
+      REDIS_HOST: 127.0.0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_pgsql, intl, zip, gd, bcmath, redis
+          coverage: none
+      - name: Instalar dependencias
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Preparar entorno
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+      - name: Estilo de código (Pint)
+        run: vendor/bin/pint --test
+      - name: Pruebas
+        run: php artisan test
+
+  storefront:
+    name: Storefront (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: storefront
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: storefront/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env:
+          FLUX_API_INTERNAL_URL: http://localhost:8000
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
