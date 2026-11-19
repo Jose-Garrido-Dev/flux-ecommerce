@@ -2,10 +2,10 @@ import "server-only";
 
 /**
  * Cliente de la API storefront de Laravel.
- * Solo se ejecuta en el servidor de Next.js: la URL interna y cualquier
- * credencial nunca llegan al navegador.
+ * Solo se ejecuta en el servidor de Next.js: la URL interna y el secreto
+ * compartido nunca llegan al navegador.
  */
-const API_BASE = process.env.FLUX_API_INTERNAL_URL ?? "http://localhost:8000";
+export const API_BASE = process.env.FLUX_API_INTERNAL_URL ?? "http://localhost:8000";
 
 export class ApiError extends Error {
   constructor(
@@ -18,34 +18,42 @@ export class ApiError extends Error {
 }
 
 type FetchOptions = {
-  /** Etiquetas para revalidación bajo demanda (p. ej. "store", "product:12") */
+  /** Etiquetas para revalidación bajo demanda (p. ej. "store", "catalog") */
   tags?: string[];
   /** Segundos de caché; false = sin caché (stock, precios, checkout) */
   revalidate?: number | false;
 };
 
-export async function apiGet<T>(path: string, opts: FetchOptions = {}): Promise<T> {
+/** Devuelve el cuerpo completo de la respuesta (data, meta, facets...). */
+export async function apiFetch<T>(path: string, opts: FetchOptions = {}): Promise<T> {
   const res = await fetch(`${API_BASE}/api/storefront/v1${path}`, {
-    headers: { Accept: "application/json" },
-    next: {
-      tags: opts.tags,
-      revalidate: opts.revalidate ?? 300,
+    headers: {
+      Accept: "application/json",
+      // Identifica al servidor de la tienda para que Laravel no lo limite como a un visitante
+      "X-Flux-Storefront-Key": process.env.REVALIDATE_SECRET ?? "",
     },
+    next: { tags: opts.tags, revalidate: opts.revalidate ?? 300 },
     signal: AbortSignal.timeout(8000),
   });
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, body.code ?? "api_error", body.title ?? res.statusText);
+    throw new ApiError(res.status, body.code ?? "api_error", body.detail ?? body.title ?? res.statusText);
   }
 
-  return (await res.json()).data as T;
+  return (await res.json()) as T;
 }
 
-export type PublicStore = {
-  name: string;
-  tagline: string | null;
-  currency: string;
-  locale: string;
-  contact: { email: string | null; phone: string | null };
-};
+export async function apiGet<T>(path: string, opts: FetchOptions = {}): Promise<T> {
+  return (await apiFetch<{ data: T }>(path, opts)).data;
+}
+
+/** Igual que apiGet, pero devuelve null si el recurso no existe (404). */
+export async function apiGetOrNull<T>(path: string, opts: FetchOptions = {}): Promise<T | null> {
+  try {
+    return await apiGet<T>(path, opts);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
+}

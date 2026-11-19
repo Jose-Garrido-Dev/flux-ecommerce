@@ -1,36 +1,82 @@
 @import "tailwindcss";
 
-/* Tokens de diseño: cada tema los sobreescribe (ver docs/arquitectura.md, sección 6) */
+/*
+ * Design system Flux — tokens.
+ * Los componentes solo usan estas variables: cambiar de tema = cambiar tokens
+ * (en la Fase 9 Laravel los entrega por tema desde /settings/theme).
+ * Tema activo: Minimalista.
+ */
 :root {
+  /* Color */
   --color-bg: #faf9f7;
-  --color-fg: #141414;
-  --color-muted: #6b6b6b;
+  --color-surface: #ffffff;
+  --color-subtle: #f1efeb;
+  --color-fg: #151515;
+  --color-muted: #5f5f5f;
   --color-accent: #1f3a5f;
-  --color-border: #e6e3de;
-  --radius: 14px;
+  --color-accent-fg: #ffffff;
+  --color-sale: #a1371f;
+  --color-success: #2f6b3f;
+  --color-border: #e4e0d9;
+  --color-focus: #2563eb;
+
+  /* Tipografía */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-display: ui-serif, Georgia, "Times New Roman", serif;
-  --motion-duration: 700ms;
+  --tracking-label: 0.18em;
+
+  /* Forma */
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.05);
+
+  /* Movimiento */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --motion-fast: 180ms;
+  --motion: 420ms;
+  --motion-slow: 700ms;
+
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --color-bg: #0f0f10;
+    --color-surface: #18181a;
+    --color-subtle: #202023;
     --color-fg: #f2f1ee;
-    --color-muted: #a3a3a3;
-    --color-accent: #9cc3ff;
-    --color-border: #2a2a2c;
+    --color-muted: #a8a8a8;
+    --color-accent: #a9c7f0;
+    --color-accent-fg: #0f0f10;
+    --color-sale: #f09a83;
+    --color-success: #8fd1a0;
+    --color-border: #2c2c2f;
+    --color-focus: #93b4ff;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+    color-scheme: dark;
   }
 }
 
 @theme inline {
   --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-subtle: var(--color-subtle);
   --color-fg: var(--color-fg);
   --color-muted: var(--color-muted);
   --color-accent: var(--color-accent);
+  --color-accent-fg: var(--color-accent-fg);
+  --color-sale: var(--color-sale);
+  --color-success: var(--color-success);
   --color-border: var(--color-border);
   --font-sans: var(--font-sans);
   --font-display: var(--font-display);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -39,15 +85,55 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Foco visible y consistente (WCAG 2.4.7) */
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.label {
+  font-size: 0.75rem;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.prose-flux p { margin: 0 0 0.9em; }
+.prose-flux ul { list-style: disc; padding-left: 1.2em; margin: 0 0 0.9em; }
+.prose-flux ol { list-style: decimal; padding-left: 1.2em; margin: 0 0 0.9em; }
+.prose-flux h3, .prose-flux h4 { font-weight: 600; margin: 1.2em 0 0.4em; }
+
+/* Entrada suave de secciones. Nunca oculta contenido si no hay animación. */
 .reveal {
-  animation: reveal var(--motion-duration) cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: reveal var(--motion-slow) var(--ease-out) both;
 }
 
 @keyframes reveal {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: none; }
 }
 
+/* Imagen secundaria de la tarjeta al pasar el cursor */
+.card-media .hover-img {
+  opacity: 0;
+  transition: opacity var(--motion) var(--ease-out);
+}
+.card-media .main-img {
+  transition: transform var(--motion-slow) var(--ease-out);
+}
+@media (hover: hover) {
+  .group:hover .card-media .hover-img { opacity: 1; }
+  .group:hover .card-media .main-img { transform: scale(1.03); }
+}
+
+/* Movimiento reducido: sin animaciones ni transiciones decorativas */
 @media (prefers-reduced-motion: reduce) {
-  .reveal { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .group:hover .card-media .main-img { transform: none; }
 }

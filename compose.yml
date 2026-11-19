@@ -55,6 +55,8 @@ services:
     environment:
       FLUX_API_INTERNAL_URL: http://nginx
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      # Solo desarrollo: igual a FLUX_REVALIDATE_SECRET de backend/.env.docker.example
+      REVALIDATE_SECRET: cambiar-en-cada-instalacion
     depends_on:
       - nginx
 
