@@ -4,7 +4,33 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ## [Sin publicar]
 
+### Corregido
+
+- Textos en inglés que se veían en el panel:
+  - La etiqueta "Attribute values" en la pestaña Especificaciones.
+  - Los nombres de modelos, acciones y resultados en Auditoría.
+  - Los nombres internos de los roles en Usuarios.
+  - "Dashboard" y "Open Graph".
+- Correos del sistema y páginas de error de Laravel traducidos (`lang/es.json`).
+- Revisiones automáticas para que no vuelva a aparecer texto en inglés en el panel, la tienda ni los correos (sección 10.1 de la guía).
+
 ### Agregado
+
+- Fase 3 (catálogo en el panel):
+  - Productos: formulario con pestañas (General, Precios con margen, Especificaciones, Envío, SEO con vista previa de Google), variantes, imágenes y productos relacionados.
+  - Acciones sobre productos: duplicar, publicar, despublicar y archivar, individuales o masivas. Un producto con pedidos no se puede eliminar.
+  - Búsqueda por nombre, SKU o código de barras, con filtros por estado, marca, categoría, precio, destacados, variantes y productos sin imágenes.
+  - Generador de combinaciones de variantes, cambio masivo de precio (monto fijo o porcentaje) y elección de la variante principal.
+  - Subida de varias imágenes a la vez: se valida el tipo real del archivo, se corrige la orientación, se reducen a 2400 px y se genera una miniatura. Se ordenan arrastrando y se puede elegir la principal y asociarlas a una variante.
+  - Panel de categorías (árbol, orden, banner, SEO, mover productos), marcas (logo, banner, SEO, archivado) y atributos (6 tipos, valores con color o imagen).
+  - Importación de CSV/Excel (Catálogo → Importar productos):
+    - Plantilla con instrucciones, mapeo de columnas, análisis previo sin escribir nada y vista previa.
+    - Errores por fila, con detección de SKU y códigos de barras repetidos.
+    - Modos crear, actualizar o ambos. Crea marcas, categorías y opciones que falten.
+    - Procesa en segundo plano mostrando el avance y entrega un informe descargable.
+  - Exportación a CSV o Excel con el mismo formato de la importación.
+  - Manuales de uso de productos, categorías, marcas, atributos e importación.
+  - API: la ficha usa el título, la descripción y la URL canónica de SEO definidos en el panel. Los productos relacionados elegidos a mano van primero.
 
 - Fase 2 (design system y tienda base):
   - Esquema del catálogo: multimedia, clases de impuesto (IVA 19% y exento), marcas, categorías en árbol, atributos, productos, variantes, precios con ofertas programadas.

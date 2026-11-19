@@ -13,12 +13,17 @@ class Brand extends Model
 {
     use Auditable;
 
-    protected $fillable = ['name', 'slug', 'description', 'logo_media_id', 'website', 'status', 'show_on_home', 'position'];
+    public const STATUSES = ['active' => 'Activa', 'archived' => 'Archivada'];
+
+    protected $fillable = [
+        'name', 'slug', 'description', 'logo_media_id', 'banner_media_id', 'website', 'country', 'status',
+        'show_on_home', 'position', 'seo_title', 'seo_description',
+    ];
 
     protected static function booted(): void
     {
         static::saving(function (Brand $brand) {
-            $brand->normalized_name = Str::lower(Str::ascii(trim($brand->name)));
+            $brand->normalized_name = static::normalize($brand->name);
             $brand->slug ??= Str::slug($brand->name);
         });
     }
@@ -26,6 +31,17 @@ class Brand extends Model
     protected function casts(): array
     {
         return ['show_on_home' => 'boolean', 'position' => 'integer'];
+    }
+
+    /** "Cordillera  Studio" y "cordillera studio" son la misma marca. */
+    public static function normalize(string $name): string
+    {
+        return Str::lower(Str::ascii(preg_replace('/\s+/', ' ', trim($name))));
+    }
+
+    public function banner(): BelongsTo
+    {
+        return $this->belongsTo(Media::class, 'banner_media_id');
     }
 
     public function logo(): BelongsTo

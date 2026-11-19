@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: p.seo.title,
     description: p.seo.description ?? undefined,
-    alternates: { canonical: `/producto/${p.slug}` },
+    alternates: { canonical: p.seo.canonical_url || `/producto/${p.slug}` },
     openGraph: { title: p.name, images: p.image ? [mediaUrl(p.image.path)] : undefined },
   };
 }

@@ -412,6 +412,10 @@ docker compose -f compose.prod.yml --env-file .env logs -f worker scheduler
 
 El panel mostrará una alerta si el scheduler deja de reportar actividad.
 
+**Importaciones de productos.** Las importaciones de CSV o Excel corren en el worker de colas. Si una importación se queda en "En cola" más de un minuto, el worker no está corriendo. En desarrollo sin Docker, ábrelo en otra terminal con `php artisan queue:work`.
+
+Una importación grande puede tardar hasta 15 minutos. Por eso `DB_QUEUE_RETRY_AFTER` (en `backend/.env`) debe ser mayor que eso: el valor por defecto es `960` segundos. Si lo bajas, el worker podría repetir una importación que todavía está en curso.
+
 ### 7.2 Respaldos
 
 Programa un respaldo diario a las 03:00 con `crontab -e` (usuario `flux`):
@@ -494,6 +498,22 @@ Los cambios se ven en la tienda en hasta 5 minutos (o al instante si la revalida
 - La tipografía (Bricolage Grotesque, licencia libre OFL) está dentro del proyecto en `storefront/src/app/fonts` y la sirve el propio servidor: no se usa Google Fonts ni otro servicio externo.
 - Los colores y formas están en variables al inicio de `storefront/src/app/globals.css` (tema "Lapislázuli", con modo oscuro automático). Para cambiar la identidad de un cliente basta con cambiar esas variables; en la Fase 9 se podrán editar desde el panel.
 
+### 9.3 Cargar el catálogo
+
+Orden recomendado la primera vez:
+
+1. **Catálogo → Atributos**: crea Color, Talla y las demás opciones. Marca "Se usa para variantes" en las que el cliente elige al comprar.
+2. **Catálogo → Categorías** y **Catálogo → Marcas**.
+3. **Catálogo → Productos → Nuevo producto**. Después de guardar aparecen las pestañas *Variantes* (con **Generar combinaciones**), *Imágenes* y *Relacionados*.
+4. Para cargar muchos productos usa **Catálogo → Importar productos**:
+   - Descarga la plantilla Excel. Trae una hoja de instrucciones con cada columna.
+   - Completa una fila por variante. Las columnas obligatorias son `sku`, `nombre` y `precio`.
+   - Sube el archivo y revisa el análisis. Hasta ese paso no se cambia nada del catálogo.
+   - Confirma la importación. Al terminar puedes descargar el CSV con los errores de cada fila.
+   - Para actualizar precios en masa: exporta desde el listado de productos, edita el archivo en Excel y vuelve a importarlo. Las celdas vacías no borran los datos que ya existen.
+
+Las imágenes se guardan en el disco del servidor, en `backend/storage/app/public/catalog`. Cada imagen se reduce a 2400 px como máximo y se le genera una miniatura. Inclúyelas en los respaldos (sección 7.2). Cada pantalla del panel tiene su botón **Manual de uso**.
+
 ## 10. Pruebas y calidad
 
 ```bash
@@ -512,6 +532,16 @@ Cada push a GitHub ejecuta automáticamente estas verificaciones (`.github/workf
 - **Docker (entorno de desarrollo):** ejecuta `./infra/scripts/install-dev.sh` y verifica que la API y la tienda respondan.
 
 Si ambas pasan, la tienda se construye y arranca en cualquier equipo con Docker, sin depender de nada instalado en la máquina.
+
+### 10.1 Todo en español
+
+Regla del proyecto: todo lo que ve una persona está en español, sin mezclar inglés. Eso incluye el panel, la tienda, las notificaciones, los mensajes de error y los correos. Hay tres revisiones automáticas:
+
+- `tests/Feature/Language/SpanishOnlyAdminTest.php` abre cada pantalla del panel con datos reales y falla si encuentra texto visible en inglés. Esto atrapa, por ejemplo, etiquetas que Filament genera a partir del nombre de un campo.
+- `SpanishOnlyModalsTest.php` abre los formularios de las acciones y envía formularios vacíos para revisar los mensajes de validación. `SpanishOnlyEmailsTest.php` revisa los correos y las páginas de error.
+- En la CI, `packages/qa/check-spanish.mjs` revisa las páginas de la tienda ya generadas: portada, catálogo, categoría, ficha, búsqueda y 404.
+
+La lista de palabras está en `packages/qa/palabras-ingles.json`. Si una palabra es válida en español (por ejemplo "stock"), se agrega a `permitidas`. Los textos fijos de Laravel, como los correos y las páginas de error, se traducen en `backend/lang/es.json`.
 
 ## 11. Problemas frecuentes
 

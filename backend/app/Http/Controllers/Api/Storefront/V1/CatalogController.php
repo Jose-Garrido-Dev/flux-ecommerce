@@ -90,16 +90,26 @@ class CatalogController extends Controller
             return $this->notFound('El producto no existe o no está publicado.');
         }
 
-        $related = $this->search->search([
-            'category' => $product->primaryCategory?->status === 'active' ? $product->primaryCategory : null,
-            'brand' => $product->primaryCategory ? null : $product->brand,
-            'exclude_ids' => [$product->id],
-            'per_page' => 8,
-        ]);
+        // Primero los elegidos a mano en el panel (pestaña Relacionados); se completa con la misma categoría
+        $manual = Product::query()->visible()
+            ->joinSub($product->relations()->getQuery()->select(['related_product_id', 'position']), 'rel', 'rel.related_product_id', '=', 'products.id')
+            ->orderBy('rel.position')->select('products.*')
+            ->with(ProductPresenter::CARD_RELATIONS)->limit(8)->get()->unique('id');
+
+        $related = $manual;
+        if ($manual->count() < 8) {
+            $auto = $this->search->search([
+                'category' => $product->primaryCategory?->status === 'active' ? $product->primaryCategory : null,
+                'brand' => $product->primaryCategory ? null : $product->brand,
+                'exclude_ids' => [$product->id, ...$manual->modelKeys()],
+                'per_page' => 8 - $manual->count(),
+            ]);
+            $related = $manual->concat($auto->items());
+        }
 
         return response()->json([
             'data' => $this->presenter->detail($product),
-            'related' => collect($related->items())->map(fn (Product $p) => $this->presenter->card($p))->all(),
+            'related' => $related->map(fn (Product $p) => $this->presenter->card($p))->values()->all(),
         ]);
     }
 

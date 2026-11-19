@@ -11,7 +11,17 @@ class Attribute extends Model
 {
     use Auditable;
 
-    protected $fillable = ['code', 'name', 'type', 'unit', 'display', 'is_filterable', 'is_variant_axis', 'visible_in_catalog', 'position'];
+    public const TYPES = [
+        'select' => 'Selector', 'color' => 'Color', 'text' => 'Texto', 'number' => 'Número',
+        'image' => 'Imagen', 'measure' => 'Medida',
+    ];
+
+    public const DISPLAYS = ['pill' => 'Botones', 'swatch' => 'Muestras de color', 'select' => 'Lista desplegable'];
+
+    protected $fillable = [
+        'code', 'name', 'type', 'unit', 'display', 'is_filterable', 'is_variant_axis', 'visible_in_catalog',
+        'is_required', 'position',
+    ];
 
     protected function casts(): array
     {
@@ -19,6 +29,7 @@ class Attribute extends Model
             'is_filterable' => 'boolean',
             'is_variant_axis' => 'boolean',
             'visible_in_catalog' => 'boolean',
+            'is_required' => 'boolean',
             'position' => 'integer',
         ];
     }

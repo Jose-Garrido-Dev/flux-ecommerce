@@ -9,7 +9,7 @@ use Illuminate\Database\Seeder;
 class ModuleStatusSeeder extends Seeder
 {
     public const MODULES = [
-        1 => ['Dashboard administrativo', 11], 2 => ['Gestión de productos', 3], 3 => ['Categorías y subcategorías', 3],
+        1 => ['Tablero de inicio', 11], 2 => ['Gestión de productos', 3], 3 => ['Categorías y subcategorías', 3],
         4 => ['Marcas', 3], 5 => ['Atributos y variantes', 3], 6 => ['Inventario y bodegas', 4],
         7 => ['Pedidos', 8], 8 => ['Pasarelas de pago', 6], 9 => ['Envíos y logística', 7],
         10 => ['Clientes y cuentas', 5], 11 => ['Cupones y promociones', 10], 12 => ['Marketing y newsletter', 10],
@@ -26,10 +26,11 @@ class ModuleStatusSeeder extends Seeder
     public function run(): void
     {
         foreach (self::MODULES as $number => [$name, $phase]) {
+            // El nombre y la fase se actualizan; el estado y la evidencia los mantiene el equipo
             ModuleStatus::query()->firstOrCreate(
                 ['number' => $number],
                 ['name' => $name, 'phase' => $phase, 'state' => 'pending'],
-            );
+            )->update(['name' => $name, 'phase' => $phase]);
         }
     }
 }

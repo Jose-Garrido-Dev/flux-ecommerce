@@ -13,7 +13,7 @@ class Media extends Model
 
     protected $table = 'media';
 
-    protected $fillable = ['disk', 'path', 'mime', 'size', 'width', 'height', 'alt', 'title', 'checksum', 'uploaded_by'];
+    protected $fillable = ['disk', 'path', 'original_name', 'mime', 'size', 'width', 'height', 'alt', 'title', 'checksum', 'variants', 'uploaded_by'];
 
     public function uniqueIds(): array
     {
@@ -22,12 +22,20 @@ class Media extends Model
 
     protected function casts(): array
     {
-        return ['size' => 'integer', 'width' => 'integer', 'height' => 'integer'];
+        return ['size' => 'integer', 'width' => 'integer', 'height' => 'integer', 'variants' => 'array'];
     }
 
     public function url(): string
     {
         return Storage::disk($this->disk)->url($this->path);
+    }
+
+    /** URL de la miniatura (si se generó) o del original. Para el panel. */
+    public function thumbUrl(): string
+    {
+        $thumb = $this->variants['thumb'] ?? null;
+
+        return Storage::disk($this->disk)->url($thumb ?? $this->path);
     }
 
     /** Datos públicos para el storefront. `path` es relativo: el storefront lo sirve en /media/{path}. */

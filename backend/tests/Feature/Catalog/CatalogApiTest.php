@@ -236,4 +236,19 @@ class CatalogApiTest extends TestCase
         $this->getJson('/api/storefront/v1/home', ['X-Flux-Storefront-Key' => 'otra-clave'])->assertOk();
         $this->getJson('/api/storefront/v1/home', ['X-Flux-Storefront-Key' => 'otra-clave'])->assertTooManyRequests();
     }
+
+    public function test_product_uses_manual_relations_first_and_custom_seo(): void
+    {
+        $main = $this->product('Cafetera', [['price' => 20000]], ['seo_title' => 'Cafetera italiana de aluminio', 'seo_description' => 'Para 6 tazas.']);
+        $filter = $this->product('Filtros', [['price' => 3000]]);
+        $hidden = $this->product('Oculto', [['price' => 3000]], ['status' => ProductStatus::Draft]);
+        $main->relations()->create(['related_product_id' => $filter->id, 'type' => 'complementary', 'position' => 1]);
+        $main->relations()->create(['related_product_id' => $hidden->id, 'type' => 'related', 'position' => 2]);
+
+        $this->getJson(self::URL.'/cafetera')->assertOk()
+            ->assertJsonPath('data.seo.title', 'Cafetera italiana de aluminio')
+            ->assertJsonPath('data.seo.description', 'Para 6 tazas.')
+            ->assertJsonPath('related.0.slug', 'filtros')
+            ->assertJsonMissing(['slug' => 'oculto']);
+    }
 }
