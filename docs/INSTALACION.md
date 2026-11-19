@@ -471,7 +471,12 @@ docker compose exec storefront npm run lint
 docker compose exec storefront npx tsc --noEmit
 ```
 
-Cada push a GitHub ejecuta automáticamente estas verificaciones (`.github/workflows/ci.yml`).
+Cada push a GitHub ejecuta automáticamente estas verificaciones (`.github/workflows/ci.yml`), además de dos pruebas de Docker en una máquina limpia:
+
+- **Docker (instalación de producción de punta a punta):** sigue literalmente los pasos de la sección 6 (configurar `.env`, construir, generar `APP_KEY`, primer despliegue, datos base, crear administrador), verifica la API, el panel, la tienda y que el worker y el scheduler estén vivos (`/api/health/ready` en `ok`), hace un respaldo y luego un segundo despliegue como si fuera una actualización.
+- **Docker (entorno de desarrollo):** ejecuta `./infra/scripts/install-dev.sh` y verifica que la API y la tienda respondan.
+
+Si ambas pasan, la tienda se construye y arranca en cualquier equipo con Docker, sin depender de nada instalado en la máquina.
 
 ## 11. Problemas frecuentes
 
@@ -487,5 +492,6 @@ Cada push a GitHub ejecuta automáticamente estas verificaciones (`.github/workf
 | Permisos de archivos en `storage/` (Linux) | UID distinto entre tu usuario y el contenedor | `UID=$(id -u) GID=$(id -g) docker compose build app` |
 | Puerto 5432, 3000 u 8000 ocupado | Otro servicio local | Cambiar `DB_FORWARD_PORT`, `STOREFRONT_PORT` o `BACKEND_PORT` al ejecutar compose |
 | Con Webuzo, el dominio muestra la página por defecto de Webuzo | Falta el archivo de proxy del dominio o no se reinició el servidor web | Revisar el paso 6 de la sección 6.7 |
+| Error 502 en la API justo después de actualizar | Nginx apuntaba a la IP antigua del contenedor `app` (corregido en la configuración incluida) o PHP aún está arrancando | Esperar unos segundos; si sigue, `docker compose -f compose.prod.yml --env-file .env restart web` |
 | Con Webuzo, error 502/503 en el dominio | Los contenedores de Flux no están corriendo | `docker compose -f compose.prod.yml --env-file .env ps` |
 | Con Webuzo, error al subir imágenes grandes | Límite de tamaño del proxy | Aumentar `client_max_body_size` (Nginx) o `LimitRequestBody` (Apache) |
