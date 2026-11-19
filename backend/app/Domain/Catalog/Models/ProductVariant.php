@@ -2,12 +2,16 @@
 
 namespace App\Domain\Catalog\Models;
 
+use App\Domain\Inventory\Models\InventoryItem;
+use App\Domain\Inventory\Models\InventoryLevel;
+use App\Domain\Inventory\Services\InventoryService;
 use App\Domain\System\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ProductVariant extends Model
 {
@@ -17,6 +21,12 @@ class ProductVariant extends Model
         'product_id', 'sku', 'barcode', 'status', 'is_default', 'position',
         'weight_g', 'length_mm', 'width_mm', 'height_mm', 'image_media_id',
     ];
+
+    protected static function booted(): void
+    {
+        // Toda variante nueva nace con su ficha de inventario y stock 0 en la bodega principal
+        static::created(fn (ProductVariant $variant) => app(InventoryService::class)->initialize($variant));
+    }
 
     protected function casts(): array
     {
@@ -49,6 +59,16 @@ class ProductVariant extends Model
     {
         return $this->belongsToMany(AttributeValue::class, 'variant_attribute_values', 'variant_id')
             ->withPivot('attribute_id');
+    }
+
+    public function inventoryItem(): HasOne
+    {
+        return $this->hasOne(InventoryItem::class, 'variant_id');
+    }
+
+    public function levels(): HasMany
+    {
+        return $this->hasMany(InventoryLevel::class, 'variant_id');
     }
 
     public function priceIn(string $currency = 'CLP'): ?VariantPrice
