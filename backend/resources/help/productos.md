@@ -4,7 +4,7 @@
 
 ## Secciones
 - **Listado:** busca por nombre, SKU o código de barras. Filtra por estado, marca, categoría, precio, destacados, con variantes o sin imágenes.
-- **Formulario:** pestañas *General*, *Precios*, *Especificaciones*, *Envío* y *SEO*.
+- **Formulario:** pestañas *General*, *Precios*, *Especificaciones*, *Envío*, *Inventario* y *SEO*.
 - **Pestañas extra al editar:** *Variantes*, *Imágenes* y *Relacionados* aparecen una vez creado el producto.
 
 ## Campos principales
@@ -35,6 +35,15 @@
 - **Generar combinaciones:** marca los valores (ej.: Negro, Blanco × S, M, L) y se crean 6 variantes con SKU `PREFIJO-NEGRO-S`. Las que ya existen se omiten. Máximo 300 por vez.
 - **Cambiar precio** en masa: fija un monto o sube/baja un porcentaje a las variantes seleccionadas.
 - Una variante con pedidos no se elimina: se desactiva.
+
+## Inventario
+- **Controlar stock:** si está encendido, la tienda no vende más de lo disponible. Apagado = se vende sin límite.
+- **Permitir sobreventa:** se puede comprar sin stock (venta por encargo). La tienda lo muestra como "Disponible por encargo".
+- **Stock mínimo:** bajo este número el producto aparece en la alerta *Stock bajo*.
+- **Stock inicial** (solo al crear): queda registrado como *Entrada manual* en la bodega elegida.
+- Al editar se ve el stock por bodega. Para cambiarlo usa **Registrar movimiento** (arriba) o *Inventario → Existencias*: el stock nunca se escribe directo, siempre deja un movimiento.
+- Con variantes, cada una tiene su propio stock: en la pestaña *Variantes*, botón **Inventario** (Movimiento, Conteo, Configurar).
+- La lista de productos tiene la columna **Stock** (unidades disponibles en bodegas activas) y el filtro **Disponibilidad**.
 
 ## Imágenes
 - Sube varias a la vez (JPG, PNG, WebP o GIF, hasta 10 MB). Se reducen a 2400 px, se corrige la orientación y se genera una miniatura.
@@ -69,5 +78,5 @@ Selecciona productos en el listado para **publicar**, **despublicar** o **archiv
 
 ## Relaciones con otros módulos
 - **Categorías, marcas y atributos** organizan y filtran el catálogo.
-- **Inventario** (fase siguiente) lleva el stock de cada variante.
+- **Inventario** lleva el stock de cada variante por bodega (ver *Inventario → Existencias*).
 - **Pedidos** guardan copia del nombre y precio al momento de la compra.

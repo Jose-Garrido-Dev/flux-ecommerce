@@ -2,8 +2,6 @@
 
 namespace App\Domain\Catalog\Import;
 
-use App\Domain\Inventory\Models\Warehouse;
-use App\Domain\Inventory\Services\InventoryService;
 use App\Domain\Catalog\Enums\ProductStatus;
 use App\Domain\Catalog\Models\Attribute;
 use App\Domain\Catalog\Models\AttributeValue;
@@ -14,6 +12,8 @@ use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductVariant;
 use App\Domain\Catalog\Services\ProductPresenter;
 use App\Domain\Catalog\Services\ProductWriter;
+use App\Domain\Inventory\Models\Warehouse;
+use App\Domain\Inventory\Services\InventoryService;
 use App\Domain\Pricing\Models\TaxClass;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;

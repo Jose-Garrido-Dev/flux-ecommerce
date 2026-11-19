@@ -2,12 +2,12 @@
 
 namespace App\Domain\Catalog\Services;
 
-use App\Domain\Inventory\Services\InventoryService;
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\Media;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductVariant;
 use App\Domain\Catalog\Models\VariantPrice;
+use App\Domain\Inventory\Services\InventoryService;
 
 /**
  * Convierte productos en los datos públicos que recibe el storefront.

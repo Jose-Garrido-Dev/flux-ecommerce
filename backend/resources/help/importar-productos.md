@@ -29,11 +29,15 @@
 | destacado | `si` o `no` |
 | impuesto | `iva` o `exento` |
 | opcion1_nombre / opcion1_valor | `Color` / `Negro` (hasta 3 opciones) |
+| stock | `25`: unidades contadas en la bodega principal. Se registra como *ajuste por conteo* con la diferencia |
+| stock_minimo | `5`: bajo esta cantidad aparece en *Stock bajo* |
+| controlar_stock | `si` o `no`. Si informas `stock`, se activa solo |
 
 ## Reglas
 - Las **celdas vacías no borran** datos existentes: puedes subir solo `sku` y `precio` para cambiar precios.
 - Un SKU o código de barras repetido en el archivo se informa con el número de fila.
 - Los archivos de Excel en español (separados por punto y coma) y los guardados como "CSV (Windows)" se leen bien.
+- El **stock** reemplaza el valor de la bodega principal (no suma): si dice 25 y había 20, queda un ajuste de +5 en *Inventario → Movimientos*. No puede ser menor a lo que está reservado.
 - Máximo 20.000 filas y 20 MB por archivo.
 - Si activas *Crear marcas, categorías y opciones que no existan*, se crean automáticamente; si no, esas filas quedan con error.
 

@@ -9,6 +9,7 @@ use App\Domain\Pricing\Models\TaxClass;
 use App\Filament\Concerns\HasHelpManual;
 use App\Filament\Resources\Products\Concerns\SavesProduct;
 use App\Filament\Resources\Products\ProductResource;
+use App\Filament\Support\InventoryActions;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
@@ -43,6 +44,7 @@ class EditProduct extends EditRecord
     protected function mutateFormDataBeforeFill(array $data): array
     {
         $data['default_variant'] = $this->defaultVariantFormData($this->record);
+        $data['inventory'] = $this->inventoryFormData($this->record);
         // Productos creados antes de tener impuesto asignado (p. ej. importados): se propone IVA
         $data['tax_class_id'] ??= TaxClass::query()->where('is_default', true)->value('id');
 
@@ -65,6 +67,9 @@ class EditProduct extends EditRecord
 
         return [
             $this->helpManualAction(),
+            InventoryActions::movement('stockMovement', fn (Product $record, array $data) => [
+                $record->variants()->where('is_default', true)->value('id'), $data['warehouse_id'],
+            ])->visible(fn () => ! $this->record->has_variants)->color('gray'),
             Action::make('viewInStore')->label('Ver en la tienda')->icon(Heroicon::OutlinedArrowTopRightOnSquare)->color('gray')
                 ->url(fn () => rtrim(config('flux.storefront_url'), '/').'/producto/'.$this->record->slug, shouldOpenInNewTab: true)
                 ->visible(fn () => $this->record->isVisible()),

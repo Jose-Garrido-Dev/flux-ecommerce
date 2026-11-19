@@ -2,10 +2,10 @@
 
 namespace App\Domain\Catalog\Import;
 
-use App\Domain\Inventory\Models\Warehouse;
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductVariant;
+use App\Domain\Inventory\Models\Warehouse;
 use Illuminate\Database\Eloquent\Builder;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\Style;

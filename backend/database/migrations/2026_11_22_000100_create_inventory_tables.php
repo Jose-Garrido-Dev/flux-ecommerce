@@ -108,7 +108,7 @@ return new class extends Migration
         if (DB::getDriverName() === 'pgsql') {
             DB::statement('ALTER TABLE inventory_levels ADD CONSTRAINT inventory_levels_reserved_non_negative CHECK (reserved >= 0)');
             DB::statement('ALTER TABLE stock_reservations ADD CONSTRAINT stock_reservations_quantity_positive CHECK (quantity > 0)');
-            DB::statement("CREATE UNIQUE INDEX warehouses_one_default ON warehouses (is_default) WHERE is_default");
+            DB::statement('CREATE UNIQUE INDEX warehouses_one_default ON warehouses (is_default) WHERE is_default');
             // Los movimientos son un libro contable: no se editan ni se borran (las correcciones son contramovimientos)
             DB::unprepared(<<<'SQL'
                 CREATE OR REPLACE FUNCTION stock_movements_immutable() RETURNS trigger AS $$

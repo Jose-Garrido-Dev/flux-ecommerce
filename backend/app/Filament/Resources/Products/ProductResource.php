@@ -6,6 +6,7 @@ use App\Domain\Catalog\Enums\ProductStatus;
 use App\Domain\Catalog\Models\Attribute;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Services\ProductWriter;
+use App\Domain\Inventory\Services\InventoryReport;
 use App\Domain\Pricing\Models\TaxClass;
 use App\Filament\Resources\Categories\CategoryResource;
 use App\Filament\Resources\Products\Pages\CreateProduct;
@@ -14,6 +15,7 @@ use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Resources\Products\RelationManagers\MediaRelationManager;
 use App\Filament\Resources\Products\RelationManagers\RelatedProductsRelationManager;
 use App\Filament\Resources\Products\RelationManagers\VariantsRelationManager;
+use App\Filament\Support\InventoryActions;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
@@ -27,6 +29,7 @@ use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
@@ -206,6 +209,24 @@ class ProductResource extends Resource
                         ->helperText('Notas para el equipo de despacho, por ejemplo "no se envía a zonas extremas".'),
                 ]),
 
+                Tab::make('Inventario')->icon(Heroicon::OutlinedCube)->columns(2)->schema([
+                    Group::make()->statePath('inventory')->visible($simple)->columnSpanFull()->columns(3)
+                        ->schema(InventoryActions::itemFields()),
+                    Group::make()->statePath('inventory')->visible(fn (Get $get, ?Product $record, string $operation) => $operation === 'create' && (bool) $get('inventory.track_stock'))
+                        ->columnSpanFull()->columns(2)->schema([
+                            TextInput::make('initial_stock')->label('Stock inicial')->integer()->minValue(0)->default(0)
+                                ->helperText('Queda registrado como movimiento "Entrada manual".'),
+                            InventoryActions::warehouseSelect()->label('Bodega del stock inicial'),
+                        ]),
+                    TextEntry::make('stock_levels')->label('Stock por bodega')->columnSpanFull()
+                        ->visible(fn (?Product $record) => $record?->exists)
+                        ->state(fn (?Product $record) => $record ? self::stockLevels($record) : null)->html(),
+                    Text::make('Para cambiar el stock usa "Registrar movimiento" arriba, o Inventario → Existencias. El stock no se edita directo: cada cambio queda en el historial de movimientos.')
+                        ->visible(fn (?Product $record) => $record?->exists && ! $record->has_variants)->columnSpanFull(),
+                    Text::make('Este producto tiene variantes: el stock y su configuración se manejan por variante en la pestaña Variantes (botón "Inventario").')
+                        ->visible(fn (?Product $record) => (bool) $record?->has_variants)->columnSpanFull(),
+                ]),
+
                 Tab::make('SEO')->icon(Heroicon::OutlinedMagnifyingGlass)->columns(2)->schema([
                     TextInput::make('seo_title')->label('Metatítulo')->maxLength(70)->live(onBlur: true)
                         ->helperText('Hasta 70 caracteres. Vacío = nombre del producto.'),
@@ -229,7 +250,7 @@ class ProductResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['brand', 'primaryCategory', 'media', 'variants.prices']))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['brand', 'primaryCategory', 'media', 'variants.prices', 'variants.inventoryItem', 'variants.levels.warehouse']))
             ->defaultSort('updated_at', 'desc')
             ->searchPlaceholder('Nombre, SKU o código de barras')
             ->columns([
@@ -251,6 +272,11 @@ class ProductResource extends Resource
                     ->getStateUsing(fn (Product $p) => self::priceSummary($p)['cost']),
                 TextColumn::make('margin')->label('Margen')->alignEnd()->toggleable()
                     ->getStateUsing(fn (Product $p) => self::priceSummary($p)['margin']),
+                TextColumn::make('stock')->label('Stock')->alignEnd()
+                    ->getStateUsing(fn (Product $p) => self::stockSummary($p))
+                    ->color(fn (Product $p) => match (self::stockSummary($p)) {
+                        'Sin stock' => 'danger', 'Sin control' => 'gray', default => null,
+                    }),
                 TextColumn::make('status')->label('Estado')->badge()
                     ->formatStateUsing(fn (ProductStatus $state) => $state->label())
                     ->color(fn (ProductStatus $state) => match ($state) {
@@ -281,6 +307,14 @@ class ProductResource extends Resource
                         filled($data['min'] ?? null) ? 'Desde $'.number_format((int) $data['min'], 0, ',', '.') : null,
                         filled($data['max'] ?? null) ? 'Hasta $'.number_format((int) $data['max'], 0, ',', '.') : null,
                     ])),
+                SelectFilter::make('stock')->label('Disponibilidad')
+                    ->options(['in' => 'Con stock', 'out' => 'Sin stock', 'low' => 'Stock bajo'])
+                    ->query(fn (Builder $query, array $data) => match ($data['value'] ?? null) {
+                        'out' => $query->whereHas('variants', fn ($v) => $v->whereIn('id', app(InventoryReport::class)->outOfStock())),
+                        'low' => $query->whereHas('variants', fn ($v) => $v->whereIn('id', app(InventoryReport::class)->lowStock())),
+                        'in' => $query->whereHas('variants', fn ($v) => $v->where('status', 'active')->whereNotIn('id', app(InventoryReport::class)->outOfStock())),
+                        default => $query,
+                    }),
                 TernaryFilter::make('featured')->label('Destacado'),
                 TernaryFilter::make('has_variants')->label('Con variantes'),
                 Filter::make('without_image')->label('Sin imágenes')->toggle()
@@ -339,6 +373,38 @@ class ProductResource extends Resource
     }
 
     /** @return array{price: ?string, cost: ?string, margin: ?string} */
+    /** Unidades disponibles sumando variantes y bodegas activas (texto para la lista). */
+    public static function stockSummary(Product $product): string
+    {
+        $tracked = $product->variants->filter(fn ($v) => $v->inventoryItem?->track_stock ?? false);
+        if ($tracked->isEmpty()) {
+            return 'Sin control';
+        }
+        $units = $tracked->sum(fn ($v) => $v->levels->filter(fn ($l) => $l->warehouse?->status === 'active')
+            ->sum(fn ($l) => max(0, $l->on_hand - $l->reserved)));
+
+        return $units > 0 ? number_format($units, 0, ',', '.').' u.' : 'Sin stock';
+    }
+
+    /** Tabla HTML con el stock de cada variante por bodega (pestaña Inventario). */
+    public static function stockLevels(Product $product): string
+    {
+        $rows = $product->variants()->with(['levels.warehouse', 'inventoryItem', 'attributeValues'])->orderBy('position')->get()
+            ->flatMap(fn ($v) => $v->levels->map(fn ($l) => [
+                e($product->has_variants ? ($v->attributeValues->pluck('label')->implode(' / ') ?: $v->sku) : $v->sku),
+                e($l->warehouse?->name ?? '—'), $l->on_hand, $l->reserved, $l->on_hand - $l->reserved,
+            ]));
+        if ($rows->isEmpty()) {
+            return 'Sin stock registrado.';
+        }
+        $html = '<table class="w-full text-sm"><thead><tr class="text-left text-gray-500"><th>Variante</th><th>Bodega</th><th>Físico</th><th>Reservado</th><th>Disponible</th></tr></thead><tbody>';
+        foreach ($rows as $r) {
+            $html .= '<tr><td>'.implode('</td><td>', $r).'</td></tr>';
+        }
+
+        return $html.'</tbody></table>';
+    }
+
     public static function priceSummary(Product $product): array
     {
         $prices = $product->variants->map(fn ($v) => $v->priceIn('CLP'))->filter();

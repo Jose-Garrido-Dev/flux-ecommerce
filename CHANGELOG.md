@@ -16,6 +16,22 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ### Agregado
 
+- Fase 4 (inventario y bodegas):
+  - Bodegas con dirección, región, comuna, responsable, prioridad y bodega principal. Viene creada la *Bodega principal*.
+  - Existencias por producto, variante y bodega: físico, reservado, disponible, mínimo y estado. Filtros por bodega, estado y control de stock.
+  - Movimientos: entrada por compra, entrada manual, devolución, salida manual, merma, ajustes, ventas, transferencias, reservas y liberaciones. Cada uno guarda antes, después, motivo, referencia, usuario y fecha. No se editan ni se borran (la base de datos lo impide): se corrigen con **Revertir**, que crea un contramovimiento.
+  - Conteo físico: se escribe lo contado y la diferencia queda como ajuste.
+  - Transferencias entre bodegas en una sola operación.
+  - Reservas de stock con duración configurable. El programador de tareas libera las vencidas cada minuto. Un aviso de pago repetido no descuenta dos veces.
+  - Control de concurrencia: 20 compras simultáneas por la última unidad venden exactamente una (prueba en PostgreSQL).
+  - Alertas: sin stock, stock bajo, reservas vencidas sin liberar, sin movimientos en 90 días, diferencias de inventario, mayor rotación y sobreventa permitida. Se ven en el inicio del panel y en Existencias.
+  - Productos: pestaña *Inventario* (controlar stock, sobreventa, stock mínimo, stock inicial y stock por bodega), columna *Stock* y filtro *Disponibilidad*. Botón *Inventario* en cada variante.
+  - Configuración → Inventario: duración de la reserva y valores por defecto para productos nuevos.
+  - Importación y exportación con las columnas `stock`, `stock_minimo` y `controlar_stock`.
+  - Tienda: "Disponible", "¡Quedan N unidades!", "Agotado por ahora" o "Disponible por encargo" en la ficha, variantes agotadas tachadas, sello "Agotado" en las tarjetas y filtro "Solo productos disponibles".
+  - API 0.5.0: filtro `in_stock`, campo `in_stock` en las tarjetas y objeto `stock` en cada variante.
+  - Rol *Inventario* con acceso a estas pantallas. Manuales de bodegas, existencias, movimientos, transferencias, reservas y configuración.
+
 - Fase 3 (catálogo en el panel):
   - Productos: formulario con pestañas (General, Precios con margen, Especificaciones, Envío, SEO con vista previa de Google), variantes, imágenes y productos relacionados.
   - Acciones sobre productos: duplicar, publicar, despublicar y archivar, individuales o masivas. Un producto con pedidos no se puede eliminar.

@@ -6,6 +6,7 @@ use App\Domain\Catalog\Enums\ProductStatus;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductVariant;
 use App\Domain\Catalog\Models\VariantPrice;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -179,7 +180,7 @@ class ProductWriter
         return $this->historyBlocker([$variant->id], 'Desactívala en lugar de eliminarla.');
     }
 
-    /** @param  \Illuminate\Database\Eloquent\Builder|array<int>  $variantIds */
+    /** @param  Builder|array<int>  $variantIds */
     private function historyBlocker($variantIds, string $advice): ?string
     {
         if (Schema::hasTable('order_items') && DB::table('order_items')->whereIn('variant_id', $variantIds)->exists()) {

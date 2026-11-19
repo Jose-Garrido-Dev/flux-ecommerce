@@ -412,6 +412,8 @@ docker compose -f compose.prod.yml --env-file .env logs -f worker scheduler
 
 El panel mostrará una alerta si el scheduler deja de reportar actividad.
 
+**Reservas de stock.** El scheduler ejecuta cada minuto `inventory:expire-reservations`, que libera las reservas de carritos y pagos que vencieron. Si el scheduler no corre, ese stock queda apartado y no se puede vender: la tarjeta *Reservas vencidas sin liberar* del panel lo avisa. En desarrollo sin Docker, ábrelo en otra terminal con `php artisan schedule:work`, o libera a mano con `php artisan inventory:expire-reservations`.
+
 **Importaciones de productos.** Las importaciones de CSV o Excel corren en el worker de colas. Si una importación se queda en "En cola" más de un minuto, el worker no está corriendo. En desarrollo sin Docker, ábrelo en otra terminal con `php artisan queue:work`.
 
 Una importación grande puede tardar hasta 15 minutos. Por eso `DB_QUEUE_RETRY_AFTER` (en `backend/.env`) debe ser mayor que eso: el valor por defecto es `960` segundos. Si lo bajas, el worker podría repetir una importación que todavía está en curso.
@@ -512,6 +514,12 @@ Orden recomendado la primera vez:
    - Confirma la importación. Al terminar puedes descargar el CSV con los errores de cada fila.
    - Para actualizar precios en masa: exporta desde el listado de productos, edita el archivo en Excel y vuelve a importarlo. Las celdas vacías no borran los datos que ya existen.
 
+5. **Inventario → Bodegas**: cambia el nombre y la dirección de la *Bodega principal* que viene creada, y agrega otras si tienes más de una (por ejemplo, una tienda física).
+6. **Configuración → Inventario**: duración de la reserva (30 minutos por defecto) y si los productos nuevos controlan stock.
+7. Carga el stock: en el formulario de producto (*Stock inicial*), con la columna `stock` de la importación, o en **Inventario → Existencias → Registrar movimiento**. Cada cambio queda en *Inventario → Movimientos*.
+
+Al actualizar desde la Fase 3: los productos que ya existían quedan con **Controlar stock apagado** (se siguen vendiendo sin límite, como antes). Actívalo por producto en la pestaña *Inventario*, o importa un archivo con las columnas `sku` y `stock` (al informar stock se activa solo).
+
 Las imágenes se guardan en el disco del servidor, en `backend/storage/app/public/catalog`. Cada imagen se reduce a 2400 px como máximo y se le genera una miniatura. Inclúyelas en los respaldos (sección 7.2). Cada pantalla del panel tiene su botón **Manual de uso**.
 
 ## 10. Pruebas y calidad
@@ -559,4 +567,6 @@ La lista de palabras está en `packages/qa/palabras-ingles.json`. Si una palabra
 | Con Webuzo, el dominio muestra la página por defecto de Webuzo | Falta el archivo de proxy del dominio o no se reinició el servidor web | Revisar el paso 6 de la sección 6.7 |
 | Error 502 en la API justo después de actualizar | Nginx apuntaba a la IP antigua del contenedor `app` (corregido en la configuración incluida) o PHP aún está arrancando | Esperar unos segundos; si sigue, `docker compose -f compose.prod.yml --env-file .env restart web` |
 | Con Webuzo, error 502/503 en el dominio | Los contenedores de Flux no están corriendo | `docker compose -f compose.prod.yml --env-file .env ps` |
+| La tienda muestra "Agotado" aunque hay stock | Stock reservado por carritos que no se liberan porque el scheduler no corre, o la bodega está inactiva | Revisar *Inventario → Reservas* y la sección 7.1; revisar el estado de la bodega |
+| No se puede cargar stock en un producto | El rol del usuario no tiene permiso de inventario | Asignar el rol *Inventario* o *Administrador de tienda* en Usuarios |
 | Con Webuzo, error al subir imágenes grandes | Límite de tamaño del proxy | Aumentar `client_max_body_size` (Nginx) o `LimitRequestBody` (Apache) |

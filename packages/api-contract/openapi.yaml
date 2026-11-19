@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Flux Storefront API
-  version: 0.4.0
+  version: 0.5.0
   description: >
     Contrato entre el backend Laravel y el storefront Next.js.
     Todo endpoint nuevo se agrega aquí antes de implementarse.
@@ -77,6 +77,7 @@ paths:
         - { name: sort, in: query, schema: { type: string, enum: [relevance, newest, price_asc, price_desc, name] } }
         - { name: featured, in: query, schema: { type: boolean } }
         - { name: on_sale, in: query, schema: { type: boolean }, description: Solo productos con una oferta vigente }
+        - { name: in_stock, in: query, schema: { type: boolean }, description: "Solo productos con al menos una variante comprable (con stock, sin control de stock o con sobreventa)" }
         - { name: min_price, in: query, schema: { type: integer, minimum: 0 }, description: Precio vigente con IVA, en CLP }
         - { name: max_price, in: query, schema: { type: integer, minimum: 0 } }
         - name: filter
@@ -244,6 +245,13 @@ components:
         is_new: { type: boolean, description: Publicado en los últimos 30 días }
         swatches: { type: array, items: { type: object, properties: { label: { type: string }, color_hex: { type: string } } }, description: Colores disponibles en variantes activas }
         variant_count: { type: integer }
+        in_stock: { type: boolean, description: "false si todas las variantes están agotadas" }
+    StockStatus:
+      type: object
+      description: "Disponibilidad de una variante. La cantidad exacta solo se informa cuando quedan pocas unidades."
+      properties:
+        availability: { type: string, enum: [in_stock, low_stock, out_of_stock, backorder], description: "backorder = se vende sin stock (por encargo)" }
+        quantity: { type: [integer, "null"], description: "Unidades disponibles si availability es low_stock; 0 si está agotado; null en otro caso" }
     ProductDetail:
       allOf:
         - { $ref: "#/components/schemas/ProductCard" }
@@ -273,6 +281,7 @@ components:
                   options: { type: object, additionalProperties: { type: string } }
                   price: { oneOf: [{ $ref: "#/components/schemas/Price" }, { type: "null" }] }
                   image: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
+                  stock: { $ref: "#/components/schemas/StockStatus" }
             specifications: { type: array, items: { type: object, properties: { name: { type: string }, value: { type: string } } } }
             seo: { type: object, properties: { title: { type: string }, description: { type: [string, "null"] }, canonical_url: { type: [string, "null"], description: "URL canónica definida en el panel; null usa la de la ficha" } } }
     ProductList:
