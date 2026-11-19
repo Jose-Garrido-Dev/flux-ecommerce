@@ -35,7 +35,7 @@ class BusinessSettings extends Page implements HasForms
     protected string $view = 'filament.pages.business-settings';
 
     public const FIELDS = [
-        'store_name', 'tagline', 'legal_name', 'rut', 'business_activity', 'address',
+        'store_name', 'tagline', 'announcement', 'legal_name', 'rut', 'business_activity', 'address',
         'region_code', 'commune', 'contact_email', 'contact_phone', 'business_hours',
         'instagram', 'facebook', 'tiktok',
     ];
@@ -70,7 +70,11 @@ class BusinessSettings extends Page implements HasForms
             ->components([
                 Section::make('Tienda')->columns(2)->schema([
                     TextInput::make('store_name')->label('Nombre de la tienda')->required()->maxLength(80),
-                    TextInput::make('tagline')->label('Frase breve')->maxLength(140),
+                    TextInput::make('tagline')->label('Frase breve')->maxLength(140)
+                        ->helperText('Se muestra como titular de la portada.'),
+                    TextInput::make('announcement')->label('Barra de anuncios')->maxLength(300)->columnSpanFull()
+                        ->placeholder('Despacho a todo Chile | 3 cuotas sin interés')
+                        ->helperText('Mensajes que se muestran sobre el menú de la tienda. Separa varios con | . Déjalo vacío para ocultar la barra.'),
                 ]),
                 Section::make('Datos legales')->columns(2)->schema([
                     TextInput::make('legal_name')->label('Razón social')->maxLength(150),

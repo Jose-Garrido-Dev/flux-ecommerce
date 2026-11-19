@@ -105,17 +105,33 @@ docker compose exec app php artisan flux:admin
 
 Te pedirá nombre, correo y contraseña (mínimo 12 caracteres) y le asignará el rol **Superadministrador técnico**.
 
-### 3.4 Direcciones útiles en desarrollo
+### 3.4 Catálogo de demostración (opcional, solo desarrollo)
+
+Para ver la tienda con productos mientras desarrollas:
+
+```bash
+docker compose exec app php artisan flux:demo          # crea 20 productos, categorías, marcas e imágenes de ejemplo
+docker compose exec app php artisan flux:demo --remove # los borra, sin tocar los datos reales
+```
+
+Todo lo que crea queda marcado (SKU `DEMO-…`, direcciones `demo-…`, imágenes en `storage/app/public/demo/`). El comando **se niega a correr en producción**: una tienda real nunca muestra datos de ejemplo. Las imágenes de ejemplo vienen dentro del repositorio (`backend/database/demo/images`, ~2 MB) y el comando solo las copia al disco público, sin descargar nada. Si quieres regenerarlas (por ejemplo para cambiar colores), están dibujadas por código en `infra/demo-art/generate.js`:
+
+```bash
+cd infra/demo-art && npm install playwright && node generate.js   # requiere Chromium de Playwright
+```
+
+### 3.5 Direcciones útiles en desarrollo
 
 | Qué | Dirección |
 | --- | --- |
-| Tienda (storefront) | <http://localhost:3000> |
+| Tienda (storefront) | <http://localhost:3000> (catálogo en `/catalogo`, búsqueda en `/buscar`) |
+| API pública del catálogo | <http://localhost:8000/api/storefront/v1/catalog/products> |
 | Panel administrativo | <http://localhost:8000/admin> |
 | Estado del backend | <http://localhost:8000/api/health> y <http://localhost:8000/api/health/ready> |
 | Correos enviados (Mailpit) | <http://localhost:8025> |
 | PostgreSQL desde tu equipo | `localhost:5432`, base `flux`, usuario `flux`, clave `flux` |
 
-### 3.5 Comandos del día a día
+### 3.6 Comandos del día a día
 
 ```bash
 docker compose up -d                 # levantar todo
@@ -186,7 +202,8 @@ Nunca subas archivos `.env` al repositorio: contienen claves. El `.gitignore` ya
 | `APP_TIMEZONE` | `America/Santiago` | Zona horaria de la tienda |
 | `APP_LOCALE` | `es` | Idioma |
 | `FLUX_STOREFRONT_URL` | `https://www.mitienda.cl` | URL de la tienda; se usa para enlaces en correos y CORS |
-| `FLUX_REVALIDATE_SECRET` | texto largo aleatorio | Secreto compartido con Next.js para refrescar páginas cuando cambian productos |
+| `FLUX_REVALIDATE_SECRET` | texto largo aleatorio | Secreto compartido con Next.js. Sirve para dos cosas: refrescar páginas cuando cambian productos, y que el servidor de la tienda no quede limitado por `FLUX_STOREFRONT_RATE_LIMIT` (todas las visitas le llegan a Laravel desde la misma IP) |
+| `FLUX_STOREFRONT_RATE_LIMIT` | `120` | Consultas por minuto a la API pública permitidas a cada IP que **no** sea el servidor de la tienda |
 | `DB_CONNECTION` | `pgsql` | Motor de base de datos |
 | `DB_HOST` / `DB_PORT` | `postgres` / `5432` | En Docker el host es el nombre del servicio |
 | `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` | | Credenciales de la base |
@@ -209,7 +226,7 @@ Las credenciales de pasarelas de pago, couriers e IA **no van en el `.env`**: se
 | --- | --- | --- |
 | `FLUX_API_INTERNAL_URL` | `http://localhost:8000` | URL del backend que usa el servidor de Next.js. En Docker: `http://nginx` (dev) o `http://web` (prod) |
 | `NEXT_PUBLIC_SITE_URL` | `https://www.mitienda.cl` | URL pública de la tienda (SEO, enlaces) |
-| `REVALIDATE_SECRET` | igual a `FLUX_REVALIDATE_SECRET` | Valida que las peticiones de revalidación vengan del backend |
+| `REVALIDATE_SECRET` | igual a `FLUX_REVALIDATE_SECRET` | Valida que las peticiones de revalidación vengan del backend, y la tienda lo envía a Laravel para identificarse. **Si no coinciden, la tienda puede recibir errores 429 con mucho tráfico** |
 
 Solo las variables que empiezan con `NEXT_PUBLIC_` llegan al navegador. **Nunca** pongas claves con ese prefijo.
 
@@ -319,6 +336,9 @@ Caddy obtiene y renueva los certificados automáticamente.
 - <https://api.mitienda.cl/api/health/ready> debe responder `"status":"ok"`.
 - <https://api.mitienda.cl/admin> muestra el ingreso al panel.
 - <https://www.mitienda.cl> muestra la tienda.
+- <https://www.mitienda.cl/catalogo> muestra el catálogo (vacío hasta que cargues productos).
+
+**Imágenes del catálogo:** se guardan en el disco del servidor (volumen `storage`). Nginx las publica en `https://api.mitienda.cl/storage/...` y la tienda las entrega optimizadas (AVIF/WebP, tamaño según pantalla) en `https://www.mitienda.cl/media/...`. No se necesita S3 ni CDN.
 
 ### 6.7 Servidor con Webuzo
 
@@ -458,6 +478,21 @@ Por defecto Flux no usa ninguno de estos servicios. Solo valen la pena en tienda
 2. Revisa el **Tablero de avance** (Sistema → Módulos) para ver qué está disponible.
 3. Configuración disponible en Fase 1: datos del negocio, usuarios y roles.
 4. Activa la verificación en dos pasos para los usuarios con permisos financieros cuando esté disponible (Fase 13).
+
+### 9.1 Barra de anuncios, titular y redes de la tienda
+
+En **Configuración → Datos del negocio**:
+
+- **Frase breve**: es el titular grande de la portada.
+- **Barra de anuncios**: mensajes que corren en la franja superior de la tienda. Separa cada mensaje con `|`, por ejemplo `Despacho a todo Chile | Precios con IVA incluido`. Vacío = sin barra.
+- **Instagram / Facebook / TikTok**: aparecen en el pie de página solo los que completes.
+
+Los cambios se ven en la tienda en hasta 5 minutos (o al instante si la revalidación está configurada).
+
+### 9.2 Tipografía y colores de la tienda
+
+- La tipografía (Bricolage Grotesque, licencia libre OFL) está dentro del proyecto en `storefront/src/app/fonts` y la sirve el propio servidor: no se usa Google Fonts ni otro servicio externo.
+- Los colores y formas están en variables al inicio de `storefront/src/app/globals.css` (tema "Lapislázuli", con modo oscuro automático). Para cambiar la identidad de un cliente basta con cambiar esas variables; en la Fase 9 se podrán editar desde el panel.
 
 ## 10. Pruebas y calidad
 

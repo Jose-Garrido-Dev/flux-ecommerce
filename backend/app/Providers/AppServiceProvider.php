@@ -33,8 +33,17 @@ class AppServiceProvider extends ServiceProvider
         // Detecta en desarrollo consultas N+1 y atributos no rellenables
         Model::shouldBeStrict(! $this->app->isProduction());
 
-        RateLimiter::for('storefront', fn (Request $request) => Limit::perMinute(config('flux.storefront_rate_limit'))
-            ->by($request->ip()));
+        // El servidor Next.js hace las consultas en nombre de todos los visitantes desde una sola IP:
+        // se identifica con el secreto compartido y no se limita. Cualquier otro cliente sí.
+        RateLimiter::for('storefront', function (Request $request) {
+            $secret = (string) config('flux.revalidate_secret');
+            $sent = (string) $request->header('X-Flux-Storefront-Key');
+            if ($secret !== '' && $sent !== '' && hash_equals($secret, $sent)) {
+                return Limit::none();
+            }
+
+            return Limit::perMinute(config('flux.storefront_rate_limit'))->by($request->ip());
+        });
 
         // Se guarda en UTC y se muestra en hora de Chile
         FilamentTimezone::set(config('flux.display_timezone'));

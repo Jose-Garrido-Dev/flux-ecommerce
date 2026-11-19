@@ -4,7 +4,7 @@ Tienda e-commerce independiente para el mercado chileno, construida con **Larave
 
 ## Estado
 
-**Fase 1 de 15: fundaciones.** El avance real, módulo por módulo y con evidencia, está en [docs/module-status.md](docs/module-status.md). Ninguna integración externa (pagos, couriers, IA) se declara operativa hasta probarla con credenciales reales.
+**Fase 2 de 15: design system y tienda base** (la Fase 1, fundaciones, está terminada). El avance real, módulo por módulo y con evidencia, está en [docs/module-status.md](docs/module-status.md). Ninguna integración externa (pagos, couriers, IA) se declara operativa hasta probarla con credenciales reales.
 
 ## Inicio rápido (desarrollo)
 
@@ -15,6 +15,7 @@ git clone https://github.com/Jose-Garrido-Dev/flux-ecommerce.git
 cd flux-ecommerce
 ./infra/scripts/install-dev.sh
 docker compose exec app php artisan flux:admin
+docker compose exec app php artisan flux:demo   # opcional: catálogo de demostración (solo desarrollo)
 ```
 
 - Tienda: <http://localhost:3000>

@@ -6,7 +6,7 @@ use Illuminate\Database\Seeder;
 
 /**
  * Datos base REALES necesarios en toda instalación (también en producción).
- * Nunca agregar aquí productos, clientes o pedidos de ejemplo: esos van en DemoSeeder (futuro),
+ * Nunca agregar aquí productos, clientes o pedidos de ejemplo: esos los crea el comando `flux:demo`,
  * que solo se ejecuta en desarrollo.
  */
 class DatabaseSeeder extends Seeder
@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             RegionSeeder::class,
+            TaxClassSeeder::class,
             RolesAndPermissionsSeeder::class,
             ModuleStatusSeeder::class,
         ]);

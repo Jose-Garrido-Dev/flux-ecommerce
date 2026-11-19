@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Flux Storefront API
-  version: 0.1.0
+  version: 0.3.0
   description: >
     Contrato entre el backend Laravel y el storefront Next.js.
     Todo endpoint nuevo se agrega aquí antes de implementarse.
@@ -48,6 +48,126 @@ paths:
                   data: { $ref: "#/components/schemas/PublicStore" }
         "429":
           description: Límite de solicitudes excedido
+  /storefront/v1/home:
+    get:
+      summary: Bloques fijos de la portada (categorías destacadas, destacados, recién llegados, marcas)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      categories: { type: array, items: { $ref: "#/components/schemas/CategoryCard" } }
+                      featured: { type: array, items: { $ref: "#/components/schemas/ProductCard" } }
+                      newest: { type: array, items: { $ref: "#/components/schemas/ProductCard" } }
+                      on_sale: { type: array, items: { $ref: "#/components/schemas/ProductCard" }, description: Productos con una oferta vigente }
+                      brands: { type: array, items: { $ref: "#/components/schemas/BrandCard" } }
+  /storefront/v1/catalog/products:
+    get:
+      summary: Listado de productos publicados con filtros, orden y facetas
+      parameters:
+        - { name: category, in: query, schema: { type: string }, description: Slug; incluye subcategorías }
+        - { name: brand, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: Busca en nombre, descripción corta, marca y SKU }
+        - { name: sort, in: query, schema: { type: string, enum: [relevance, newest, price_asc, price_desc, name] } }
+        - { name: featured, in: query, schema: { type: boolean } }
+        - { name: on_sale, in: query, schema: { type: boolean }, description: Solo productos con una oferta vigente }
+        - { name: min_price, in: query, schema: { type: integer, minimum: 0 }, description: Precio vigente con IVA, en CLP }
+        - { name: max_price, in: query, schema: { type: integer, minimum: 0 } }
+        - name: filter
+          in: query
+          style: deepObject
+          schema: { type: object, additionalProperties: { type: string } }
+          description: "filter[color]=negro,blanco. O dentro de un atributo, Y entre atributos. Códigos que no son atributos filtrables se ignoran."
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 48, default: 24 } }
+        - { name: facets, in: query, schema: { type: boolean, default: true } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductList" }
+        "404":
+          description: La categoría o marca no existe o no está publicada
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422":
+          description: Parámetros inválidos
+  /storefront/v1/catalog/products/{slug}:
+    get:
+      summary: Ficha de producto publicado y productos relacionados
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ProductDetail" }
+                  related: { type: array, items: { $ref: "#/components/schemas/ProductCard" } }
+        "404":
+          description: No existe o no está publicado
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /storefront/v1/catalog/categories:
+    get:
+      summary: Árbol de categorías del menú
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/CategoryNode" } }
+  /storefront/v1/catalog/categories/{slug}:
+    get:
+      summary: Categoría con migas de pan y subcategorías
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: OK }
+        "404":
+          description: No existe, está oculta o alguna categoría superior está oculta
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /storefront/v1/catalog/brands:
+    get:
+      summary: Marcas activas
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/BrandCard" } }
+  /storefront/v1/catalog/brands/{slug}:
+    get:
+      summary: Marca activa
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: OK }
+        "404":
+          description: No existe o no está activa
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
 components:
   schemas:
     Readiness:
@@ -75,3 +195,130 @@ components:
           properties:
             email: { type: [string, "null"] }
             phone: { type: [string, "null"] }
+        announcements: { type: array, items: { type: string }, description: "Mensajes de la barra de anuncios (configurados en el panel, separados por |)" }
+        social:
+          type: object
+          description: Solo las redes configuradas
+          properties:
+            instagram: { type: string, format: uri }
+            facebook: { type: string, format: uri }
+            tiktok: { type: string, format: uri }
+    Problem:
+      type: object
+      description: RFC 9457 (application/problem+json)
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        code: { type: string, example: not_found }
+        detail: { type: string }
+    Image:
+      type: object
+      description: "path es relativo: la tienda lo sirve en /media/{path}"
+      properties:
+        path: { type: string }
+        alt: { type: string }
+        width: { type: [integer, "null"] }
+        height: { type: [integer, "null"] }
+    Price:
+      type: object
+      description: Montos en CLP sin decimales, IVA incluido
+      properties:
+        currency: { type: string, example: CLP }
+        amount: { type: integer, description: Precio vigente (oferta si está activa) }
+        compare_at: { type: [integer, "null"], description: Precio anterior a tachar }
+        discount_percent: { type: [integer, "null"] }
+        sale_ends_at: { type: [string, "null"], format: date-time }
+        varies: { type: boolean, description: "Solo en tarjetas: true si las variantes tienen precios distintos (se muestra 'Desde')" }
+    ProductCard:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        brand: { type: [object, "null"], properties: { name: { type: string }, slug: { type: string } } }
+        image: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
+        hover_image: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
+        price: { oneOf: [{ $ref: "#/components/schemas/Price" }, { type: "null" }] }
+        featured: { type: boolean }
+        is_new: { type: boolean, description: Publicado en los últimos 30 días }
+        swatches: { type: array, items: { type: object, properties: { label: { type: string }, color_hex: { type: string } } }, description: Colores disponibles en variantes activas }
+        variant_count: { type: integer }
+    ProductDetail:
+      allOf:
+        - { $ref: "#/components/schemas/ProductCard" }
+        - type: object
+          properties:
+            short_description: { type: [string, "null"] }
+            description_html: { type: [string, "null"], description: "HTML saneado: solo p, br, strong, b, em, i, ul, ol, li, h3, h4, blockquote, sin atributos" }
+            images: { type: array, items: { $ref: "#/components/schemas/Image" } }
+            breadcrumbs: { type: array, items: { type: object, properties: { name: { type: string }, slug: { type: string } } } }
+            tax: { type: object, properties: { included: { type: boolean }, label: { type: string } } }
+            options:
+              type: array
+              items:
+                type: object
+                properties:
+                  code: { type: string }
+                  name: { type: string }
+                  display: { type: string, enum: [swatch, pill, select] }
+                  values: { type: array, items: { type: object, properties: { value: { type: string }, label: { type: string }, color_hex: { type: [string, "null"] } } } }
+            variants:
+              type: array
+              items:
+                type: object
+                properties:
+                  sku: { type: string }
+                  is_default: { type: boolean }
+                  options: { type: object, additionalProperties: { type: string } }
+                  price: { oneOf: [{ $ref: "#/components/schemas/Price" }, { type: "null" }] }
+                  image: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
+            specifications: { type: array, items: { type: object, properties: { name: { type: string }, value: { type: string } } } }
+            seo: { type: object, properties: { title: { type: string }, description: { type: [string, "null"] } } }
+    ProductList:
+      type: object
+      properties:
+        data: { type: array, items: { $ref: "#/components/schemas/ProductCard" } }
+        meta:
+          type: object
+          properties:
+            page: { type: integer }
+            per_page: { type: integer }
+            total: { type: integer }
+            last_page: { type: integer }
+        facets:
+          type: array
+          items:
+            type: object
+            properties:
+              code: { type: string }
+              name: { type: string }
+              display: { type: string }
+              values:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    value: { type: string }
+                    label: { type: string }
+                    color_hex: { type: [string, "null"] }
+                    count: { type: integer, description: Productos con este valor, ignorando el filtro de su propio atributo }
+                    selected: { type: boolean }
+    CategoryCard:
+      type: object
+      properties:
+        name: { type: string }
+        slug: { type: string }
+        image: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
+    CategoryNode:
+      allOf:
+        - { $ref: "#/components/schemas/CategoryCard" }
+        - type: object
+          properties:
+            children: { type: array, items: { $ref: "#/components/schemas/CategoryNode" } }
+    BrandCard:
+      type: object
+      properties:
+        name: { type: string }
+        slug: { type: string }
+        logo: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }

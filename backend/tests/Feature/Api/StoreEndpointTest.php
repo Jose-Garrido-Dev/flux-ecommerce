@@ -15,6 +15,8 @@ class StoreEndpointTest extends TestCase
         app(SettingsRepository::class)->putMany('business', [
             'store_name' => 'Tienda Flux',
             'tagline' => 'Calidad en cada detalle',
+            'announcement' => 'Despacho a todo Chile |  | Cuotas sin interés ',
+            'instagram' => 'https://instagram.com/tienda',
             'contact_email' => 'hola@tienda.test',
             'rut' => '12.345.678-5',
             'legal_name' => 'Flux SpA',
@@ -25,7 +27,9 @@ class StoreEndpointTest extends TestCase
             ->assertJsonPath('data.name', 'Tienda Flux')
             ->assertJsonPath('data.tagline', 'Calidad en cada detalle')
             ->assertJsonPath('data.currency', 'CLP')
-            ->assertJsonPath('data.contact.email', 'hola@tienda.test');
+            ->assertJsonPath('data.contact.email', 'hola@tienda.test')
+            ->assertJsonPath('data.announcements', ['Despacho a todo Chile', 'Cuotas sin interés'])
+            ->assertJsonPath('data.social.instagram', 'https://instagram.com/tienda');
 
         $this->assertStringNotContainsString('12.345.678-5', $response->getContent());
     }
