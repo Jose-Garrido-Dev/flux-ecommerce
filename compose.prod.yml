@@ -1,0 +1,109 @@
+# Entorno de PRODUCCIÓN: una instalación = una tienda. Ver docs/INSTALACION.md, sección 6.
+# Las variables ${...} se leen del archivo .env de la raíz (copiar desde .env.example).
+name: flux
+
+x-php: &php
+  image: flux-backend:${FLUX_VERSION:-latest}
+  env_file: backend/.env
+  environment:
+    PHP_OPCACHE_VALIDATE_TIMESTAMPS: "0"
+  volumes:
+    - storage:/var/www/backend/storage
+  depends_on:
+    postgres:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  app:
+    <<: *php
+    build:
+      context: .
+      dockerfile: infra/docker/php/Dockerfile
+      target: production
+  worker:
+    <<: *php
+    command: php artisan queue:work --tries=3 --backoff=10 --max-time=3600
+  scheduler:
+    <<: *php
+    command: php artisan schedule:work
+
+  assets:
+    image: flux-backend:${FLUX_VERSION:-latest}
+    # Se reutiliza la imagen del backend solo para copiar /public al volumen compartido
+    entrypoint: ["sh", "-c", "cp -r /var/www/backend/public/. /srv/public/ && sleep infinity"]
+    volumes:
+      - backend_public:/srv/public
+    restart: unless-stopped
+
+  web:
+    image: nginx:1.27-alpine
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:80"
+    volumes:
+      - ./infra/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - backend_public:/var/www/backend/public:ro
+    depends_on:
+      - app
+      - assets
+    restart: unless-stopped
+
+  storefront:
+    build:
+      context: .
+      dockerfile: infra/docker/node.Dockerfile
+      args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+    image: flux-storefront:${FLUX_VERSION:-latest}
+    environment:
+      FLUX_API_INTERNAL_URL: http://web
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET}
+    ports:
+      - "127.0.0.1:${STOREFRONT_PORT:-3000}:3000"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # OPCIONAL: solo se levanta con --profile redis (ver docs/INSTALACION.md, sección 8.2)
+  redis:
+    image: redis:7-alpine
+    profiles: ["redis"]
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # OPCIONAL: solo se levanta con --profile search
+  meilisearch:
+    image: getmeili/meilisearch:v1.11
+    profiles: ["search"]
+    environment:
+      MEILI_MASTER_KEY: ${MEILISEARCH_KEY}
+      MEILI_ENV: production
+    volumes:
+      - meilidata:/meili_data
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  meilidata:
+  storage:
+  backend_public:

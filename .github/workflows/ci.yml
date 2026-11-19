@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (Laravel)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: flux_test
+          POSTGRES_USER: flux
+          POSTGRES_PASSWORD: flux
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U flux -d flux_test"
+          --health-interval 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: flux_test
+      DB_USERNAME: flux
+      DB_PASSWORD: flux
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_pgsql, intl, zip, gd, bcmath, redis
+          coverage: none
+      - name: Instalar dependencias
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Preparar entorno
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+      - name: Estilo de código (Pint)
+        run: vendor/bin/pint --test
+      - name: Pruebas
+        run: php artisan test
+
+  storefront:
+    name: Storefront (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: storefront
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: storefront/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env:
+          FLUX_API_INTERNAL_URL: http://localhost:8000
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+
+  docker:
+    name: Docker (instalación de producción de punta a punta)
+    runs-on: ubuntu-latest
+    # Sigue los pasos de docs/INSTALACION.md, sección 6, en una máquina limpia.
+    # Si este job pasa, la tienda se construye y arranca en cualquier equipo con Docker.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar variables (sección 6.3)
+        run: |
+          cp .env.example .env
+          cp backend/.env.production.example backend/.env
+          PASS="$(openssl rand -hex 24)"
+          SECRET="$(openssl rand -hex 32)"
+          sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$PASS|; s|^REVALIDATE_SECRET=.*|REVALIDATE_SECRET=$SECRET|; s|^NEXT_PUBLIC_SITE_URL=.*|NEXT_PUBLIC_SITE_URL=http://localhost:3000|" .env
+          sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$PASS|; s|^FLUX_REVALIDATE_SECRET=.*|FLUX_REVALIDATE_SECRET=$SECRET|; s|^APP_URL=.*|APP_URL=http://localhost:8000|; s|^SESSION_DOMAIN=.*|SESSION_DOMAIN=null|" backend/.env
+      - name: Construir imágenes y generar APP_KEY
+        run: |
+          docker compose -f compose.prod.yml --env-file .env build
+          KEY="$(docker compose -f compose.prod.yml --env-file .env run --rm -T app php artisan key:generate --show | tr -d '\r')"
+          sed -i "s|^APP_KEY=.*|APP_KEY=$KEY|" backend/.env
+      - name: Primer despliegue (sección 6.4)
+        run: |
+          ./infra/scripts/deploy.sh
+          docker compose -f compose.prod.yml --env-file .env exec -T app php artisan db:seed --force
+          docker compose -f compose.prod.yml --env-file .env exec -T app php artisan flux:admin --name="Prueba CI" --email=ci@example.com --password="$(openssl rand -hex 16)"
+      - name: Verificar backend, panel y tienda
+        run: |
+          set -x
+          curl -fsS http://127.0.0.1:8000/api/health
+          curl -fsS http://127.0.0.1:8000/api/storefront/v1/store
+          curl -fsS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8000/admin/login | grep -q 200
+          # Los recursos del panel (CSS/JS de Filament) deben servirse
+          curl -fsS http://127.0.0.1:8000/admin/login | grep -o 'href="[^"]*\.css[^"]*"' | head -1
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:3000 -o page.html && break; sleep 2; done
+          grep -q "<html" page.html
+          # Worker y scheduler deben reportar latido: readiness pasa a "ok"
+          for i in $(seq 1 45); do
+            STATUS="$(curl -fsS http://127.0.0.1:8000/api/health/ready | grep -o '"status":"[a-z]*"' | head -1)"
+            echo "$STATUS"; [ "$STATUS" = '"status":"ok"' ] && break; sleep 5
+          done
+          [ "$STATUS" = '"status":"ok"' ]
+      - name: Respaldo (sección 7)
+        run: |
+          ./infra/scripts/backup.sh
+          ls -la backups/*/
+      - name: Segundo despliegue (actualización)
+        run: ./infra/scripts/deploy.sh
+      - name: Registros si algo falló
+        if: failure()
+        run: docker compose -f compose.prod.yml --env-file .env logs --tail=200
+
+  docker-dev:
+    name: Docker (entorno de desarrollo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar con el script de desarrollo (sección 3)
+        run: ./infra/scripts/install-dev.sh
+      - name: Verificar
+        run: |
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/api/health && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8000/api/storefront/v1/store
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:3000 -o page.html && break; sleep 3; done
+          grep -q "<html" page.html
+      - name: Registros si algo falló
+        if: failure()
+        run: docker compose logs --tail=200

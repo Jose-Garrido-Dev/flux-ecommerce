@@ -1,0 +1,77 @@
+openapi: 3.1.0
+info:
+  title: Flux Storefront API
+  version: 0.1.0
+  description: >
+    Contrato entre el backend Laravel y el storefront Next.js.
+    Todo endpoint nuevo se agrega aquí antes de implementarse.
+servers:
+  - url: http://localhost:8000/api
+paths:
+  /health:
+    get:
+      summary: Liveness del backend
+      responses:
+        "200":
+          description: El proceso responde
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok] }
+  /health/ready:
+    get:
+      summary: Readiness (base de datos, caché, scheduler y worker)
+      responses:
+        "200":
+          description: Listo (ok) o degradado (scheduler sin latido)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Readiness" }
+        "503":
+          description: Falla base de datos o caché
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Readiness" }
+  /storefront/v1/store:
+    get:
+      summary: Datos públicos de la tienda
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PublicStore" }
+        "429":
+          description: Límite de solicitudes excedido
+components:
+  schemas:
+    Readiness:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, degraded, fail] }
+        checks:
+          type: object
+          properties:
+            database: { type: string, enum: [ok, fail] }
+            cache: { type: string, enum: [ok, fail] }
+            scheduler: { type: string, enum: [ok, stale] }
+            worker: { type: string, enum: [ok, stale] }
+        version: { type: string }
+    PublicStore:
+      type: object
+      required: [name, currency, locale, contact]
+      properties:
+        name: { type: string }
+        tagline: { type: [string, "null"] }
+        currency: { type: string, example: CLP }
+        locale: { type: string, example: es-CL }
+        contact:
+          type: object
+          properties:
+            email: { type: [string, "null"] }
+            phone: { type: [string, "null"] }
