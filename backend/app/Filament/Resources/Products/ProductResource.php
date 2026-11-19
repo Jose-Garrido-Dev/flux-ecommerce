@@ -160,7 +160,7 @@ class ProductResource extends Resource
 
                 Tab::make('Especificaciones')->icon(Heroicon::OutlinedListBullet)->schema([
                     Text::make('Características que se muestran en la ficha (material, capacidad, medidas...). Los atributos de variantes como Color o Talla se manejan en la pestaña Variantes.'),
-                    Repeater::make('attributeValues')->label('')
+                    Repeater::make('attributeValues')->label('Especificaciones')->hiddenLabel()
                         ->relationship('attributeValues')
                         ->addActionLabel('Agregar especificación')
                         ->columns(3)
@@ -219,7 +219,7 @@ class ProductResource extends Resource
                             'description' => $get('seo_description') ?: $get('short_description'),
                             'slug' => $get('slug'),
                         ]),
-                    Text::make('La imagen para redes sociales (Open Graph) es la imagen principal, y los datos estructurados de producto (precio, disponibilidad, marca) se generan solos en la tienda.')
+                    Text::make('La imagen que se muestra al compartir en redes sociales es la imagen principal, y los datos estructurados de producto (precio, disponibilidad, marca) se generan solos en la tienda.')
                         ->columnSpanFull(),
                 ]),
             ]),

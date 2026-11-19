@@ -4,6 +4,7 @@ namespace App\Filament\Resources\AuditLogs;
 
 use App\Domain\System\Models\AuditLog;
 use App\Filament\Resources\AuditLogs\Pages\ManageAuditLogs;
+use App\Support\Labels;
 use BackedEnum;
 use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\KeyValueEntry;
@@ -35,12 +36,12 @@ class AuditLogResource extends Resource
     {
         return $schema->components([
             TextEntry::make('created_at')->label('Fecha')->dateTime('d-m-Y H:i:s'),
-            TextEntry::make('action')->label('Acción'),
-            TextEntry::make('actor_type')->label('Origen'),
+            TextEntry::make('action')->label('Acción')->formatStateUsing(fn (?string $state) => Labels::action($state)),
+            TextEntry::make('actor_type')->label('Origen')->formatStateUsing(fn (?string $state) => Labels::actor($state)),
             TextEntry::make('actor_id')->label('Usuario (ID)')->placeholder('—'),
-            TextEntry::make('auditable_type')->label('Recurso')->placeholder('—'),
+            TextEntry::make('auditable_type')->label('Recurso')->formatStateUsing(fn (?string $state) => Labels::model($state))->placeholder('—'),
             TextEntry::make('auditable_id')->label('ID del recurso')->placeholder('—'),
-            TextEntry::make('result')->label('Resultado'),
+            TextEntry::make('result')->label('Resultado')->formatStateUsing(fn (?string $state) => Labels::result($state)),
             TextEntry::make('ip')->label('IP')->placeholder('—'),
             KeyValueEntry::make('old_values')->label('Valores anteriores')->columnSpanFull(),
             KeyValueEntry::make('new_values')->label('Valores nuevos')->columnSpanFull(),
@@ -53,17 +54,17 @@ class AuditLogResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('created_at')->label('Fecha')->dateTime('d-m-Y H:i:s')->sortable(),
-                TextColumn::make('action')->label('Acción')->searchable(),
-                TextColumn::make('actor_type')->label('Origen')->badge(),
+                TextColumn::make('action')->label('Acción')->searchable()->formatStateUsing(fn (?string $state) => Labels::action($state)),
+                TextColumn::make('actor_type')->label('Origen')->badge()->formatStateUsing(fn (?string $state) => Labels::actor($state)),
                 TextColumn::make('actor_id')->label('Usuario')->placeholder('—'),
                 TextColumn::make('auditable_type')->label('Recurso')
-                    ->formatStateUsing(fn (?string $state) => $state ? class_basename($state) : '—'),
+                    ->formatStateUsing(fn (?string $state) => Labels::model($state)),
                 TextColumn::make('auditable_id')->label('ID'),
-                TextColumn::make('result')->label('Resultado')->badge(),
+                TextColumn::make('result')->label('Resultado')->badge()->formatStateUsing(fn (?string $state) => Labels::result($state)),
             ])
             ->filters([
                 SelectFilter::make('actor_type')->label('Origen')
-                    ->options(['user' => 'Usuario', 'system' => 'Sistema', 'provider' => 'Proveedor', 'customer' => 'Cliente']),
+                    ->options(Labels::ACTORS),
             ])
             ->recordActions([ViewAction::make()]);
     }

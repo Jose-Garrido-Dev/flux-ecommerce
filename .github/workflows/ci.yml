@@ -144,11 +144,17 @@ jobs:
           curl -fsS -o /dev/null -w "%{http_code} %{content_type}\n" http://127.0.0.1:8000/storage/demo/demo-polera-esencial-negro-a.jpg | grep -q "200 image/jpeg"
           for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:3000/media/demo/demo-polera-esencial-negro-a.jpg && break; sleep 3; done
           curl -fsS -o /dev/null -w "%{http_code} %{content_type}\n" "http://127.0.0.1:3000/_next/image?url=%2Fmedia%2Fdemo%2Fdemo-polera-esencial-negro-a.jpg&w=640&q=75" | grep -q "^200 image/"
+          n=0
           for u in /catalogo /categoria/demo-ropa /producto/demo-polera-esencial "/buscar?q=taza"; do
             for i in $(seq 1 30); do curl -fsS "http://127.0.0.1:3000$u" -o page.html && break; sleep 3; done
             grep -q "Polera Esencial\|Taza" page.html
+            n=$((n+1)); cp page.html "pagina-$n.html"
           done
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/producto/no-existe)" = 404
+          curl -s http://127.0.0.1:3000/producto/no-existe -o pagina-404.html
+          curl -fsS http://127.0.0.1:3000/ -o pagina-inicio.html
+          # Regla del proyecto: todo el texto visible en español
+          node packages/qa/check-spanish.mjs pagina-*.html
       - name: Registros si algo falló
         if: failure()
         run: docker compose logs --tail=200
