@@ -33,6 +33,8 @@ class AdminAccessTest extends TestCase
         return [
             ['/admin'], ['/admin/users'], ['/admin/module-statuses'], ['/admin/audit-logs'],
             ['/admin/regions'], ['/admin/business-settings'],
+            ['/admin/products'], ['/admin/products/create'], ['/admin/categories'], ['/admin/categories/create'],
+            ['/admin/brands'], ['/admin/attributes'], ['/admin/attributes/create'], ['/admin/import-products'],
         ];
     }
 

@@ -86,9 +86,10 @@ class ProductPresenter
                 ->map(fn ($pav) => ['name' => $pav->attribute->name, 'value' => $pav->displayValue()])
                 ->values()->all(),
             'seo' => [
-                'title' => $product->name,
-                'description' => $product->short_description
-                    ?: str($this->sanitize($product->description) ?? '')->stripTags()->squish()->limit(155)->value(),
+                'title' => $product->seo_title ?: $product->name,
+                'description' => $product->seo_description ?: ($product->short_description
+                    ?: str($this->sanitize($product->description) ?? '')->stripTags()->squish()->limit(155)->value()),
+                'canonical_url' => $product->canonical_url,
             ],
         ];
     }

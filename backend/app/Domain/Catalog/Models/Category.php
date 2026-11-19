@@ -23,7 +23,12 @@ class Category extends Model
 
     public const MAX_DEPTH = 4;
 
-    protected $fillable = ['parent_id', 'name', 'slug', 'description', 'image_media_id', 'position', 'status', 'in_menu', 'on_home'];
+    public const STATUSES = ['active' => 'Activa', 'inactive' => 'Desactivada'];
+
+    protected $fillable = [
+        'parent_id', 'name', 'slug', 'description', 'image_media_id', 'banner_media_id', 'icon', 'color',
+        'position', 'status', 'in_menu', 'on_home', 'seo_title', 'seo_description',
+    ];
 
     protected static function booted(): void
     {
@@ -85,6 +90,17 @@ class Category extends Model
     public function children(): HasMany
     {
         return $this->hasMany(Category::class, 'parent_id')->orderBy('position')->orderBy('name');
+    }
+
+    public function banner(): BelongsTo
+    {
+        return $this->belongsTo(Media::class, 'banner_media_id');
+    }
+
+    /** "Ropa › Poleras": nombre con sus ancestros, para listados y selectores. */
+    public function fullName(): string
+    {
+        return $this->ancestors()->push($this)->pluck('name')->implode(' › ');
     }
 
     public function image(): BelongsTo

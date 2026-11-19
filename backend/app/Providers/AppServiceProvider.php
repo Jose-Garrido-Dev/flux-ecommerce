@@ -2,14 +2,24 @@
 
 namespace App\Providers;
 
+use App\Domain\Catalog\Models\Attribute;
+use App\Domain\Catalog\Models\Brand;
+use App\Domain\Catalog\Models\CatalogImport;
+use App\Domain\Catalog\Models\Category;
+use App\Domain\Catalog\Models\Product;
 use App\Domain\Shipping\Models\Region;
 use App\Domain\System\Models\AuditLog;
 use App\Domain\System\Models\ModuleStatus;
 use App\Domain\System\Services\AuditLogger;
 use App\Domain\System\Services\SettingsRepository;
 use App\Models\User;
+use App\Policies\AttributePolicy;
 use App\Policies\AuditLogPolicy;
+use App\Policies\BrandPolicy;
+use App\Policies\CatalogImportPolicy;
+use App\Policies\CategoryPolicy;
 use App\Policies\ModuleStatusPolicy;
+use App\Policies\ProductPolicy;
 use App\Policies\RegionPolicy;
 use App\Policies\UserPolicy;
 use Filament\Support\Facades\FilamentTimezone;
@@ -52,6 +62,11 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(ModuleStatus::class, ModuleStatusPolicy::class);
         Gate::policy(AuditLog::class, AuditLogPolicy::class);
         Gate::policy(Region::class, RegionPolicy::class);
+        Gate::policy(Product::class, ProductPolicy::class);
+        Gate::policy(Category::class, CategoryPolicy::class);
+        Gate::policy(Brand::class, BrandPolicy::class);
+        Gate::policy(Attribute::class, AttributePolicy::class);
+        Gate::policy(CatalogImport::class, CatalogImportPolicy::class);
 
         // El superadministrador técnico tiene todos los permisos
         Gate::before(fn ($user) => $user->hasRole('super-admin') ? true : null);

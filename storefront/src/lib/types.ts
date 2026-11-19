@@ -61,7 +61,7 @@ export type ProductDetail = ProductCard & {
   options: OptionAxis[];
   variants: Variant[];
   specifications: { name: string; value: string }[];
-  seo: { title: string; description: string | null };
+  seo: { title: string; description: string | null; canonical_url?: string | null };
 };
 
 export type Facet = {

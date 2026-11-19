@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Flux Storefront API
-  version: 0.3.0
+  version: 0.4.0
   description: >
     Contrato entre el backend Laravel y el storefront Next.js.
     Todo endpoint nuevo se agrega aquí antes de implementarse.
@@ -114,7 +114,7 @@ paths:
                 type: object
                 properties:
                   data: { $ref: "#/components/schemas/ProductDetail" }
-                  related: { type: array, items: { $ref: "#/components/schemas/ProductCard" } }
+                  related: { type: array, description: "Primero los elegidos en el panel, luego de la misma categoría (máx. 8)", items: { $ref: "#/components/schemas/ProductCard" } }
         "404":
           description: No existe o no está publicado
           content:
@@ -274,7 +274,7 @@ components:
                   price: { oneOf: [{ $ref: "#/components/schemas/Price" }, { type: "null" }] }
                   image: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
             specifications: { type: array, items: { type: object, properties: { name: { type: string }, value: { type: string } } } }
-            seo: { type: object, properties: { title: { type: string }, description: { type: [string, "null"] } } }
+            seo: { type: object, properties: { title: { type: string }, description: { type: [string, "null"] }, canonical_url: { type: [string, "null"], description: "URL canónica definida en el panel; null usa la de la ficha" } } }
     ProductList:
       type: object
       properties:

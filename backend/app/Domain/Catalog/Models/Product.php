@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Product extends Model
 {
@@ -18,7 +19,17 @@ class Product extends Model
 
     protected $fillable = [
         'name', 'slug', 'short_description', 'description', 'brand_id', 'primary_category_id',
-        'tax_class_id', 'type', 'status', 'featured', 'has_variants', 'published_at',
+        'tax_class_id', 'type', 'status', 'featured', 'has_variants', 'published_at', 'tags', 'video_url',
+        'is_fragile', 'special_packaging', 'requires_cold_chain', 'allows_pickup', 'shipping_notes',
+        'seo_title', 'seo_description', 'canonical_url',
+    ];
+
+    public const RELATION_TYPES = [
+        'related' => 'Relacionados',
+        'complementary' => 'Complementarios',
+        'alternative' => 'Alternativos',
+        'cross_sell' => 'Venta cruzada',
+        'recommended' => 'Recomendados',
     ];
 
     public function uniqueIds(): array
@@ -33,6 +44,11 @@ class Product extends Model
             'featured' => 'boolean',
             'has_variants' => 'boolean',
             'published_at' => 'datetime',
+            'tags' => 'array',
+            'is_fragile' => 'boolean',
+            'special_packaging' => 'boolean',
+            'requires_cold_chain' => 'boolean',
+            'allows_pickup' => 'boolean',
         ];
     }
 
@@ -67,6 +83,22 @@ class Product extends Model
             ->withPivot(['position', 'is_primary', 'variant_id'])
             ->orderByPivot('is_primary', 'desc')
             ->orderByPivot('position');
+    }
+
+    public function defaultVariant(): HasOne
+    {
+        return $this->hasOne(ProductVariant::class)->where('is_default', true);
+    }
+
+    /** Imagen principal (catálogo). */
+    public function primaryMedia(): ?Media
+    {
+        return $this->media->first();
+    }
+
+    public function relations(): HasMany
+    {
+        return $this->hasMany(ProductRelation::class)->orderBy('position');
     }
 
     public function attributeValues(): HasMany
