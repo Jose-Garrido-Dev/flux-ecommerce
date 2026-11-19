@@ -12,6 +12,8 @@ use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductVariant;
 use App\Domain\Catalog\Services\ProductPresenter;
 use App\Domain\Catalog\Services\ProductWriter;
+use App\Domain\Inventory\Models\Warehouse;
+use App\Domain\Inventory\Services\InventoryService;
 use App\Domain\Pricing\Models\TaxClass;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +56,10 @@ class CatalogImporter
 
     private array $taxes = [];
 
-    public function __construct(private readonly ProductWriter $writer) {}
+    public function __construct(
+        private readonly ProductWriter $writer,
+        private readonly InventoryService $inventory,
+    ) {}
 
     /** Lee solo los encabezados del archivo. */
     public function headers(CatalogImport $import): array
@@ -384,6 +389,14 @@ class CatalogImporter
                 $errors[] = "Destacado \"{$get('featured')}\" no válido: usa si o no.";
             }
         }
+        $trackStock = null;
+        if ($get('track_stock') !== '') {
+            $t = Str::lower(Str::ascii($get('track_stock')));
+            $trackStock = in_array($t, ['si', 's', '1', 'x'], true) ? true : (in_array($t, ['no', 'n', '0'], true) ? false : null);
+            if ($trackStock === null) {
+                $errors[] = "Controlar stock \"{$get('track_stock')}\" no válido: usa si o no.";
+            }
+        }
         $tax = null;
         if ($get('tax') !== '') {
             $tax = Str::lower(Str::ascii($get('tax')));
@@ -452,12 +465,34 @@ class CatalogImporter
             'length_mm' => $int('length_mm', 'Largo'),
             'width_mm' => $int('width_mm', 'Ancho'),
             'height_mm' => $int('height_mm', 'Alto'),
+            'stock' => $int('stock', 'Stock'),
+            'min_stock' => $int('min_stock', 'Stock mínimo'),
+            'track_stock' => $trackStock,
             'options' => $options,
             'seo_title' => $get('seo_title') ?: null,
             'seo_description' => $get('seo_description') ?: null,
         ];
 
         return [$row, $errors];
+    }
+
+    /** Stock de la fila: deja el físico de la bodega principal en la cantidad indicada, con un movimiento de ajuste. */
+    private function importStock(ProductVariant $variant, array $row): void
+    {
+        $item = $this->inventory->item($variant);
+        $settings = array_filter([
+            'track_stock' => $row['track_stock'],
+            'min_stock' => $row['min_stock'],
+        ], fn ($v) => $v !== null);
+        if ($row['stock'] !== null && $row['track_stock'] === null && ! $item->track_stock) {
+            $settings['track_stock'] = true; // si se informa stock, se controla
+        }
+        if ($settings !== []) {
+            $item->update($settings);
+        }
+        if ($row['stock'] !== null) {
+            $this->inventory->countTo($variant, Warehouse::default(), $row['stock'], 'Importación de productos');
+        }
     }
 
     /** @return array{0: int, 1: int} variantes creadas y actualizadas */
@@ -556,6 +591,7 @@ class CatalogImporter
             }
 
             $this->writer->saveVariant($variant, $data);
+            $this->importStock($variant, $row);
             $isNewVariant ? $created++ : $updated++;
 
             if ($row['options'] !== []) {

@@ -5,6 +5,9 @@ namespace Tests\Feature\Language;
 use App\Domain\Catalog\Models\Attribute;
 use App\Domain\Catalog\Models\Brand;
 use App\Domain\Catalog\Models\Category;
+use App\Domain\Inventory\Enums\MovementType;
+use App\Domain\Inventory\Models\Warehouse;
+use App\Domain\Inventory\Services\InventoryService;
 use App\Domain\Shipping\Models\Region;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -33,7 +36,17 @@ class SpanishOnlyAdminTest extends TestCase
         $product = $this->product('Polera', [['price' => 9990, 'options' => ['color' => 'negro']], ['price' => 9990, 'options' => ['color' => 'blanco']]]);
         $category = Category::query()->create(['name' => 'Ropa', 'slug' => 'ropa']);
         $brand = Brand::query()->create(['name' => 'Marca', 'slug' => 'marca']);
+        // Inventario con datos: segunda bodega, movimientos, transferencia y reserva
+        $inventory = app(InventoryService::class);
+        $variant = $product->variants()->first();
+        $main = Warehouse::default();
+        $store = Warehouse::query()->create(['name' => 'Tienda centro', 'code' => 'CENTRO', 'priority' => 10]);
+        $inventory->item($variant)->update(['track_stock' => true, 'min_stock' => 3]);
+        $inventory->move($variant, $main, MovementType::PurchaseIn, 10, 'Compra', 'document', 'Factura 1');
+        $transfer = $inventory->transfer($main, $store, [['variant_id' => $variant->id, 'quantity' => 2]], 'Reposición');
+        $inventory->reserve($variant, 1, 'cart', 'carrito-prueba');
         $records = [
+            'stock-transfers' => $transfer,
             'products' => $product, 'categories' => $category, 'brands' => $brand,
             'attributes' => Attribute::query()->first(), 'users' => $admin, 'regions' => Region::query()->first(),
         ];

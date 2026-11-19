@@ -35,6 +35,8 @@ class AdminAccessTest extends TestCase
             ['/admin/regions'], ['/admin/business-settings'],
             ['/admin/products'], ['/admin/products/create'], ['/admin/categories'], ['/admin/categories/create'],
             ['/admin/brands'], ['/admin/attributes'], ['/admin/attributes/create'], ['/admin/import-products'],
+            ['/admin/inventory'], ['/admin/stock-movements'], ['/admin/stock-transfers'], ['/admin/stock-transfers/create'],
+            ['/admin/stock-reservations'], ['/admin/warehouses'], ['/admin/inventory-settings'],
         ];
     }
 

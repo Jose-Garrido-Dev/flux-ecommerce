@@ -36,7 +36,10 @@ export function ProductCard({
           {discount ? (
             <span className="rounded-full bg-sale px-2.5 py-1 text-[0.7rem] font-semibold text-bg">-{discount}%</span>
           ) : null}
-          {product.is_new && (
+          {product.in_stock === false && (
+            <span className="rounded-full bg-fg px-2.5 py-1 text-[0.7rem] font-semibold text-bg">Agotado</span>
+          )}
+          {product.is_new && product.in_stock !== false && (
             <span className="rounded-full bg-surface/90 px-2.5 py-1 text-[0.7rem] font-semibold text-fg backdrop-blur">Nuevo</span>
           )}
         </div>

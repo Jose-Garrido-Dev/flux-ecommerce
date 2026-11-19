@@ -8,7 +8,9 @@ use App\Domain\Catalog\Models\ProductVariant;
 use App\Domain\Catalog\Services\ProductWriter;
 use App\Domain\Catalog\Services\VariantGenerator;
 use App\Filament\Resources\Products\ProductResource;
+use App\Filament\Support\InventoryActions;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
@@ -33,7 +35,6 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema as DbSchema;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -100,7 +101,7 @@ class VariantsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with(['prices', 'attributeValues.attribute', 'image']))
+            ->modifyQueryUsing(fn ($query) => $query->with(['prices', 'attributeValues.attribute', 'image', 'inventoryItem', 'levels.warehouse']))
             ->reorderable('position')
             ->defaultSort('position')
             ->columns([
@@ -116,6 +117,11 @@ class VariantsRelationManager extends RelationManager
                 TextColumn::make('sale')->label('Oferta')
                     ->state(fn (ProductVariant $r) => $r->priceIn('CLP')?->sale_amount)
                     ->formatStateUsing(fn ($state) => ProductResource::money($state))->placeholder('—'),
+                TextColumn::make('stock')->label('Disponible')
+                    ->state(fn (ProductVariant $r) => ($r->inventoryItem?->track_stock ?? false)
+                        ? $r->levels->filter(fn ($l) => $l->warehouse?->status === 'active')->sum(fn ($l) => $l->on_hand - $l->reserved)
+                        : 'Sin control')
+                    ->color(fn ($state) => is_int($state) && $state <= 0 ? 'danger' : null),
                 TextColumn::make('weight_g')->label('Peso')->suffix(' g')->placeholder('—'),
                 IconColumn::make('is_default')->label('Principal')->boolean(),
                 TextColumn::make('status')->label('Estado')->badge()
@@ -135,6 +141,11 @@ class VariantsRelationManager extends RelationManager
                 EditAction::make()
                     ->mutateRecordDataUsing(fn (array $data, ProductVariant $record) => $this->fillData($record, $data))
                     ->using(fn (ProductVariant $record, array $data) => $this->persist($record, $data)),
+                ActionGroup::make([
+                    InventoryActions::movement('stockMovement', fn (ProductVariant $r, array $data) => [$r->id, $data['warehouse_id']])->label('Movimiento'),
+                    InventoryActions::count('stockCount', fn (ProductVariant $r, array $data) => [$r->id, $data['warehouse_id']]),
+                    InventoryActions::configure('stockConfigure', fn (ProductVariant $r) => $r->id),
+                ])->label('Inventario')->icon(Heroicon::OutlinedCube)->button()->size('sm')->color('gray'),
                 Action::make('makeDefault')->label('Hacer principal')->icon(Heroicon::OutlinedStar)
                     ->visible(fn (ProductVariant $r) => ! $r->is_default)
                     ->authorize(fn () => auth()->user()->can('products.update'))
@@ -272,8 +283,8 @@ class VariantsRelationManager extends RelationManager
 
     private function deletionBlocker(ProductVariant $variant): ?string
     {
-        if (DbSchema::hasTable('order_items') && DB::table('order_items')->where('variant_id', $variant->id)->exists()) {
-            return 'Tiene pedidos asociados. Desactívala en lugar de eliminarla.';
+        if ($reason = app(ProductWriter::class)->variantDeletionBlocker($variant)) {
+            return $reason;
         }
         if ($variant->product->variants()->count() === 1) {
             return 'Es la única variante del producto.';

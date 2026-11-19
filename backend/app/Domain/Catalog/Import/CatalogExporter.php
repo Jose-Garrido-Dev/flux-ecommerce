@@ -5,6 +5,7 @@ namespace App\Domain\Catalog\Import;
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductVariant;
+use App\Domain\Inventory\Models\Warehouse;
 use Illuminate\Database\Eloquent\Builder;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\Style;
@@ -31,7 +32,7 @@ class CatalogExporter
         $writer->addRow(Row::fromValues(ImportColumns::headers(), (new Style)->setFontBold()));
 
         $query ??= Product::query();
-        $query->with(['brand', 'primaryCategory', 'categories', 'taxClass', 'variants.prices', 'variants.attributeValues.attribute'])
+        $query->with(['brand', 'primaryCategory', 'categories', 'taxClass', 'variants.prices', 'variants.attributeValues.attribute', 'variants.inventoryItem', 'variants.levels'])
             ->orderBy('id')
             ->chunk(200, function ($products) use ($writer) {
                 foreach ($products as $product) {
@@ -96,6 +97,10 @@ class CatalogExporter
             'length_mm' => $variant->length_mm,
             'width_mm' => $variant->width_mm,
             'height_mm' => $variant->height_mm,
+            // Stock físico de la bodega principal (lo que se vuelve a importar)
+            'stock' => $variant->inventoryItem?->track_stock ? (int) $variant->levels->firstWhere('warehouse_id', $this->defaultWarehouseId())?->on_hand : null,
+            'min_stock' => $variant->inventoryItem?->min_stock,
+            'track_stock' => $variant->inventoryItem ? ($variant->inventoryItem->track_stock ? 'si' : 'no') : null,
             'seo_title' => $product->seo_title,
             'seo_description' => $product->seo_description,
         ];
@@ -110,6 +115,13 @@ class CatalogExporter
     private function categoryName(Category $category): string
     {
         return $this->categoryNames[$category->id] ??= str_replace(' › ', ' > ', $category->fullName());
+    }
+
+    private ?int $defaultWarehouse = null;
+
+    private function defaultWarehouseId(): int
+    {
+        return $this->defaultWarehouse ??= Warehouse::default()->id;
     }
 
     private function writer(string $format): WriterInterface

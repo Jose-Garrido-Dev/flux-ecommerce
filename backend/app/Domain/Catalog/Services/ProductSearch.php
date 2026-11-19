@@ -27,7 +27,7 @@ class ProductSearch
 
     /**
      * @param  array{category?: ?Category, brand?: ?Brand, q?: ?string, sort?: ?string, featured?: bool,
-     *               min_price?: ?int, max_price?: ?int, filters?: array<string, list<string>>,
+     *               min_price?: ?int, max_price?: ?int, in_stock?: bool, filters?: array<string, list<string>>,
      *               page?: int, per_page?: int, exclude_ids?: list<int>}  $criteria
      */
     public function search(array $criteria): LengthAwarePaginator
@@ -99,6 +99,20 @@ class ProductSearch
 
         if ($criteria['featured'] ?? false) {
             $query->where('featured', true);
+        }
+
+        if ($criteria['in_stock'] ?? false) {
+            // Disponible: alguna variante activa sin control de stock, con sobreventa, o con stock libre en una bodega activa
+            $query->whereExists(fn (QueryBuilder $q) => $q->selectRaw('1')
+                ->from('product_variants as sv')
+                ->leftJoin('inventory_items as si', 'si.variant_id', '=', 'sv.id')
+                ->whereColumn('sv.product_id', 'products.id')
+                ->where('sv.status', 'active')
+                ->where(fn ($w) => $w->whereNull('si.id')->orWhere('si.track_stock', false)->orWhere('si.allow_backorder', true)
+                    ->orWhereExists(fn ($l) => $l->selectRaw('1')->from('inventory_levels as sl')
+                        ->join('warehouses as sw', 'sw.id', '=', 'sl.warehouse_id')
+                        ->whereColumn('sl.variant_id', 'sv.id')->where('sw.status', 'active')
+                        ->whereRaw('sl.on_hand - sl.reserved > 0'))));
         }
 
         if ($criteria['on_sale'] ?? false) {

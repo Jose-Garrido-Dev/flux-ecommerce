@@ -29,6 +29,7 @@ class CatalogController extends Controller
             'sort' => ['nullable', Rule::in(ProductSearch::SORTS)],
             'featured' => ['nullable', 'boolean'],
             'on_sale' => ['nullable', 'boolean'],
+            'in_stock' => ['nullable', 'boolean'],
             'min_price' => ['nullable', 'integer', 'min:0'],
             'max_price' => ['nullable', 'integer', 'min:0'],
             'filter' => ['nullable', 'array', 'max:10'],
@@ -56,6 +57,7 @@ class CatalogController extends Controller
             'sort' => $input['sort'] ?? null,
             'featured' => (bool) ($input['featured'] ?? false),
             'on_sale' => (bool) ($input['on_sale'] ?? false),
+            'in_stock' => (bool) ($input['in_stock'] ?? false),
             'min_price' => isset($input['min_price']) ? (int) $input['min_price'] : null,
             'max_price' => isset($input['max_price']) ? (int) $input['max_price'] : null,
             // filter[color]=rojo,azul

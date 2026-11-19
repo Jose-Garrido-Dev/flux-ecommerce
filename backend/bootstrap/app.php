@@ -12,6 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withCommands([__DIR__.'/../app/Domain/Inventory/Console'])
     ->withMiddleware(function (Middleware $middleware): void {
         // La app solo escucha en 127.0.0.1 detrás de Caddy, Nginx o el servidor web de Webuzo:
         // se confía en sus cabeceras X-Forwarded-* para generar URLs https correctas.

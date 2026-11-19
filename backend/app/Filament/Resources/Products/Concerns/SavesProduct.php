@@ -4,8 +4,12 @@ namespace App\Filament\Resources\Products\Concerns;
 
 use App\Domain\Catalog\Enums\ProductStatus;
 use App\Domain\Catalog\Models\Product;
+use App\Domain\Catalog\Models\ProductVariant;
 use App\Domain\Catalog\Services\ProductPresenter;
 use App\Domain\Catalog\Services\ProductWriter;
+use App\Domain\Inventory\Enums\MovementType;
+use App\Domain\Inventory\Models\Warehouse;
+use App\Domain\Inventory\Services\InventoryService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +25,7 @@ trait SavesProduct
     {
         $writer = app(ProductWriter::class);
         $variantData = Arr::pull($data, 'default_variant');
+        $inventory = Arr::pull($data, 'inventory');
         $publish = ($data['status'] ?? null) === ProductStatus::Active->value;
         if ($publish) {
             $data['status'] = $record?->status?->value ?? ProductStatus::Draft->value; // se publica al final, con validación
@@ -30,13 +35,16 @@ trait SavesProduct
         }
 
         try {
-            return DB::transaction(function () use ($record, $data, $variantData, $publish, $writer) {
+            return DB::transaction(function () use ($record, $data, $variantData, $inventory, $publish, $writer) {
                 $product = $record ?? new Product;
                 $product->fill(Arr::except($data, ['categories', 'attributeValues']));
                 $product->save();
 
                 if ($variantData !== null && ! $product->has_variants) {
-                    $writer->saveDefaultVariant($product, $variantData);
+                    $variant = $writer->saveDefaultVariant($product, $variantData);
+                    if (is_array($inventory)) {
+                        $this->saveInventory($variant, $inventory, $record === null);
+                    }
                 }
 
                 if ($product->primary_category_id) {
@@ -54,6 +62,30 @@ trait SavesProduct
                 $this->errorKey($key) => $messages,
             ])->all());
         }
+    }
+
+    /** Ficha de inventario de la variante por defecto y, al crear, el stock inicial como movimiento. */
+    protected function saveInventory(ProductVariant $variant, array $inventory, bool $creating): void
+    {
+        $service = app(InventoryService::class);
+        $track = (bool) ($inventory['track_stock'] ?? true);
+        $service->item($variant)->update([
+            'track_stock' => $track,
+            'allow_backorder' => $track && (bool) ($inventory['allow_backorder'] ?? false),
+            'min_stock' => $track ? (int) ($inventory['min_stock'] ?? 0) : 0,
+        ]);
+        $initial = (int) ($inventory['initial_stock'] ?? 0);
+        if ($creating && $track && $initial > 0) {
+            $warehouse = (int) ($inventory['warehouse_id'] ?? 0) ?: Warehouse::default()->id;
+            $service->move($variant, $warehouse, MovementType::ManualIn, $initial, 'Stock inicial');
+        }
+    }
+
+    protected function inventoryFormData(Product $product): array
+    {
+        $variant = $product->variants()->where('is_default', true)->first();
+
+        return $variant ? app(InventoryService::class)->item($variant)->only(['track_stock', 'allow_backorder', 'min_stock']) : [];
     }
 
     /**
@@ -89,6 +121,7 @@ trait SavesProduct
         return match (true) {
             in_array($key, $variantFields, true) => "data.default_variant.$key",
             $key === 'status' => 'data.status',
+            $key === 'quantity' => 'data.inventory.initial_stock',
             default => "data.$key",
         };
     }

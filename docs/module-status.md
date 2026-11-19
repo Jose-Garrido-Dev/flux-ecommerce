@@ -8,11 +8,11 @@ Un módulo pasa a "Validado" solo con evidencia enlazada (PR, ejecución de CI, 
 | # | Módulo | Fase | Estado | Evidencia / nota |
 | --- | --- | --- | --- | --- |
 | 1 | Tablero de inicio | 11 | Pendiente | |
-| 2 | Gestión de productos | 3 | En desarrollo | Fase 3: panel con pestañas General, Precios, Especificaciones, Envío, SEO, Variantes, Imágenes y Relacionados. Duplicar, publicar, archivar, acciones masivas, exportar e importar CSV/Excel. Importación de 1.000 productos con informe de errores y bloqueo de borrado con pedidos probados. Pestaña de IA en la Fase 12; inventario en la Fase 4 |
+| 2 | Gestión de productos | 3 | En desarrollo | Fase 3: panel con pestañas General, Precios, Especificaciones, Envío, SEO, Variantes, Imágenes y Relacionados. Duplicar, publicar, archivar, acciones masivas, exportar e importar CSV/Excel. Importación de 1.000 productos con informe de errores y bloqueo de borrado con pedidos probados. Pestaña Inventario (Fase 4) con stock inicial, stock mínimo y sobreventa. Pestaña de IA en la Fase 12 |
 | 3 | Categorías | 3 | En desarrollo | Panel: árbol, orden arrastrando, imagen, banner, SEO, mover productos y borrado protegido. Los ciclos se rechazan en el formulario (prueba) |
 | 4 | Marcas | 3 | En desarrollo | Panel con logo, banner, SEO, archivado y borrado protegido. Nombre único sin importar mayúsculas ni tildes (prueba) |
 | 5 | Atributos y variantes | 3 | En desarrollo | Panel de atributos (6 tipos) y valores. Generador de combinaciones (máx. 300 por vez), cambio de precio masivo y variante principal (pruebas) |
-| 6 | Inventario y bodegas | 4 | Pendiente | |
+| 6 | Inventario y bodegas | 4 | En desarrollo | Fase 4: bodegas, existencias por bodega, movimientos inmutables con contramovimientos (bloqueados también en la base de datos), conteos, transferencias, reservas con vencimiento automático, alertas y configuración. Prueba de 20 compras simultáneas por la última unidad en PostgreSQL: vende exactamente 1. Reserva vencida liberada por el comando programado y aviso de pago repetido sin doble descuento (pruebas). Las reservas desde el carrito llegan en la Fase 5 |
 | 7 | Pedidos | 8 | Pendiente | |
 | 8 | Pasarelas de pago | 6 | Pendiente | Webpay Plus será la primera. Ninguna verificada |
 | 9 | Envíos y logística | 7 | En desarrollo | Regiones cargadas. Comunas pendientes de cargar desde fuente oficial verificada |

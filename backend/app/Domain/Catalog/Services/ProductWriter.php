@@ -6,6 +6,7 @@ use App\Domain\Catalog\Enums\ProductStatus;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductVariant;
 use App\Domain\Catalog\Models\VariantPrice;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -170,9 +171,24 @@ class ProductWriter
      */
     public function deletionBlocker(Product $product): ?string
     {
-        if (Schema::hasTable('order_items')
-            && DB::table('order_items')->whereIn('variant_id', $product->variants()->select('id'))->exists()) {
-            return 'Tiene pedidos asociados. Archívalo en lugar de eliminarlo para conservar el historial.';
+        return $this->historyBlocker($product->variants()->select('id'), 'Archívalo en lugar de eliminarlo para conservar el historial.');
+    }
+
+    /** Motivo por el que una variante no se puede borrar (pedidos o movimientos de inventario), o null. */
+    public function variantDeletionBlocker(ProductVariant $variant): ?string
+    {
+        return $this->historyBlocker([$variant->id], 'Desactívala en lugar de eliminarla.');
+    }
+
+    /** @param  Builder|array<int>  $variantIds */
+    private function historyBlocker($variantIds, string $advice): ?string
+    {
+        if (Schema::hasTable('order_items') && DB::table('order_items')->whereIn('variant_id', $variantIds)->exists()) {
+            return "Tiene pedidos asociados. $advice";
+        }
+        if (DB::table('stock_movements')->whereIn('variant_id', $variantIds)->exists()
+            || DB::table('stock_reservations')->whereIn('variant_id', $variantIds)->where('status', 'active')->exists()) {
+            return "Tiene movimientos de inventario. $advice";
         }
 
         return null;
