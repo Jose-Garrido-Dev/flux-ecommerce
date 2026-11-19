@@ -111,7 +111,7 @@ return new class extends Migration
             DB::statement("CREATE UNIQUE INDEX warehouses_one_default ON warehouses (is_default) WHERE is_default");
             // Los movimientos son un libro contable: no se editan ni se borran (las correcciones son contramovimientos)
             DB::unprepared(<<<'SQL'
-                CREATE FUNCTION stock_movements_immutable() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION stock_movements_immutable() RETURNS trigger AS $$
                 BEGIN
                     RAISE EXCEPTION 'Los movimientos de inventario no se pueden modificar ni eliminar; registra un contramovimiento.';
                 END;

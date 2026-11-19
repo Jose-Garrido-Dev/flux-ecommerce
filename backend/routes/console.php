@@ -14,3 +14,6 @@ Schedule::job(new RecordWorkerHeartbeat)->everyMinute();
 
 // Limpieza de trabajos fallidos antiguos (colas en base de datos)
 Schedule::command('queue:prune-failed --hours=720')->daily();
+
+// Libera el stock de reservas vencidas (carritos o pedidos sin pagar)
+Schedule::command('inventory:expire-reservations')->everyMinute()->withoutOverlapping();
