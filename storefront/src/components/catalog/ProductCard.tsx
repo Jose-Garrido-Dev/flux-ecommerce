@@ -19,7 +19,7 @@ export function ProductCard({
 }) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const discount = product.price?.discount_percent;
-  const swatches = product.swatches.slice(0, 5);
+  const swatches = (product.swatches ?? []).slice(0, 5);
 
   return (
     <article className="group relative">
@@ -51,7 +51,7 @@ export function ProductCard({
         <div className="flex items-center justify-between gap-3">
           {product.brand ? <p className="label !text-[0.62rem]">{product.brand.name}</p> : <span />}
           {swatches.length > 1 && (
-            <ul className="flex -space-x-1" aria-label={`${product.swatches.length} colores`}>
+            <ul className="flex -space-x-1" aria-label={`${(product.swatches ?? []).length} colores`}>
               {swatches.map((s) => (
                 <li key={s.label} title={s.label} className="h-3.5 w-3.5 rounded-full border-2 border-bg" style={{ background: s.color_hex }}>
                   <span className="sr-only">{s.label}</span>

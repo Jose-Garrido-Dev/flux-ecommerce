@@ -48,12 +48,7 @@ export function Footer({ store, menu }: { store: PublicStore | null; menu: Categ
           </div>
         )}
       </Container>
-      <Container className="relative">
-        <p aria-hidden className="select-none overflow-hidden whitespace-nowrap font-display text-[18vw] leading-[0.8] text-wordmark">
-          {name}
-        </p>
-      </Container>
-      <Container className="relative flex flex-wrap justify-between gap-4 border-t border-white/10 py-6 text-xs text-ink-muted">
+      <Container className="relative mt-4 flex flex-wrap justify-between gap-4 border-t border-white/10 py-6 text-xs text-ink-muted">
         <span>© {year} {name}</span>
         <span>Precios en pesos chilenos con IVA incluido</span>
       </Container>

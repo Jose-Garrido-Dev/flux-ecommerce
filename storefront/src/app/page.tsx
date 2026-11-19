@@ -13,7 +13,9 @@ import { Marquee } from "@/components/home/Marquee";
 
 async function getHome(): Promise<HomeData | null> {
   try {
-    return await apiGet<HomeData>("/home", { tags: ["catalog", "home"], revalidate: 120 });
+    const home = await apiGet<HomeData>("/home", { tags: ["catalog", "home"], revalidate: 120 });
+    // Tolera un backend sin actualizar (o una respuesta en caché anterior) que aún no envía on_sale
+    return { ...home, on_sale: home.on_sale ?? [] };
   } catch {
     return null;
   }
