@@ -146,12 +146,14 @@ async function pagarConTarjeta(page, caso, tarjeta, decisionBanco) {
     await evidencia(page, caso, "opcion-tarjetas");
   }
   await fill(page, ["#card-number", "input[name=cardNumber]", 'input[autocomplete="cc-number"]', 'input[placeholder*="número" i]', 'input[placeholder*="numero" i]'], tarjeta.number, "número de tarjeta");
-  await page.waitForTimeout(800);
+  // Webpay valida el número al salir del campo y recién ahí muestra vencimiento y CVV
+  await page.keyboard.press("Tab");
+  await page.waitForTimeout(1500);
   await evidencia(page, caso, "tarjeta-ingresada");
   // Fecha y CVV aparecen después de validar el número
   for (const [sel, valor, nombre] of [["#card-exp", "1230", "vencimiento"], ["#card-cvv", tarjeta.cvv, "CVV"]]) {
     const todos = page.locator(sel);
-    await todos.first().waitFor({ state: "attached", timeout: 20000 }).catch(() => {});
+    await todos.first().waitFor({ state: "attached", timeout: 30000 }).catch(() => {});
     const n = await todos.count();
     const visibles = page.locator(`${sel}:visible`);
     const campo = (await visibles.count()) > 0 ? visibles.first() : todos.first();
