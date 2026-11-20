@@ -91,8 +91,26 @@ async function find(page, selectors, timeout = 20000) {
   return null;
 }
 
+/** Lista campos y botones visibles en cada marco (para ajustar selectores desde el registro de Actions). */
+async function describir(page) {
+  const out = [];
+  for (const frame of page.frames()) {
+    const items = await frame
+      .evaluate(() =>
+        [...document.querySelectorAll("input, button, select, a, [role=button]")]
+          .filter((e) => e.offsetParent !== null)
+          .slice(0, 60)
+          .map((e) => `${e.tagName.toLowerCase()}#${e.id}.${String(e.className).slice(0, 40)} name=${e.getAttribute("name")} type=${e.getAttribute("type")} ph=${e.getAttribute("placeholder")} aria=${e.getAttribute("aria-label")} txt=${(e.innerText || e.value || "").trim().slice(0, 40)}`),
+      )
+      .catch(() => []);
+    out.push(`  [marco] ${frame.url()}`, ...items.map((i) => `    ${i}`));
+  }
+  return out.join("\n");
+}
+
 async function fill(page, selectors, value, label) {
   const loc = await find(page, selectors);
+  if (!loc) console.log(`No se encontró ${label} en ${page.url()}:\n${await describir(page)}`);
   assert(loc, `no se encontró el campo ${label}`);
   await loc.click();
   await loc.fill("");
@@ -101,6 +119,7 @@ async function fill(page, selectors, value, label) {
 
 async function click(page, selectors, label, timeout) {
   const loc = await find(page, selectors, timeout);
+  if (!loc) console.log(`No se encontró ${label} en ${page.url()}:\n${await describir(page)}`);
   assert(loc, `no se encontró ${label}`);
   await loc.click();
 }
