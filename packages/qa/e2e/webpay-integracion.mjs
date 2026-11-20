@@ -140,7 +140,9 @@ async function pagarConTarjeta(page, caso, tarjeta, decisionBanco) {
   // Algunas versiones del formulario piden elegir primero el medio de pago
   const medio = await find(page, ["#card-number", "input[name=cardNumber]", 'input[autocomplete="cc-number"]'], 5000);
   if (!medio) {
-    await click(page, [...hasText("Tarjeta"), ...hasText("Crédito"), ...hasText("Credito")], "la opción de pago con tarjeta", 10000).catch(() => {});
+    await click(page, ["#tarjetas", "button.payment-options__method-items-option", ...hasText("Tarjeta")], "la opción de pago con tarjeta", 10000);
+    await page.waitForTimeout(1000);
+    await evidencia(page, caso, "opcion-tarjetas");
   }
   await fill(page, ["#card-number", "input[name=cardNumber]", 'input[autocomplete="cc-number"]', 'input[placeholder*="número" i]', 'input[placeholder*="numero" i]'], tarjeta.number, "número de tarjeta");
   await page.waitForTimeout(800);
@@ -250,7 +252,7 @@ await caso("anulado por el cliente en Webpay", async () => {
   const pedido = await nuevoPedido(sku);
   const c = "2-anulado";
   await irAWebpay(page, c, pedido.token, /Pagar con Webpay/);
-  await click(page, [...hasText("Anular"), 'a[href*="anular" i]', "#anular"], "el enlace Anular compra");
+  await click(page, ["button.btn-return", ...hasText("Anular"), 'a[href*="anular" i]'], "el enlace Anular compra");
   await page.waitForTimeout(1500);
   if (!page.url().startsWith(STORE)) {
     await evidencia(page, c, "confirmar-anulacion");
