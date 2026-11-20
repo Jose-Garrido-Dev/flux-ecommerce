@@ -5,6 +5,8 @@ namespace App\Domain\Orders\Services;
 use App\Domain\Orders\Models\Order;
 use App\Domain\Orders\Models\OrderEvent;
 use App\Domain\Orders\Models\OrderItem;
+use App\Domain\Orders\Models\Payment;
+use App\Domain\Payments\Gateways\WebpayPlus\WebpayPlusGateway;
 
 /** Forma pública del pedido para la tienda. Nunca incluye costos ni datos internos. */
 class OrderPresenter
@@ -51,10 +53,22 @@ class OrderPresenter
                 ]) : null,
             ],
             'payment' => [
-                'method' => 'Transferencia bancaria',
+                'method' => $payment?->methodLabel() ?? '—',
+                'method_code' => $payment?->method_code,
                 'status' => $payment?->status,
-                'expires_at' => $payment?->status === 'pending' ? $payment->expires_at?->toIso8601String() : null,
-                'transfer' => $payment?->status === 'pending' ? $this->payments->transferInstructions() : null,
+                'status_label' => $payment ? (Payment::STATUSES[$payment->status] ?? $payment->status) : null,
+                'expires_at' => $payment && in_array($payment->status, ['pending', 'failed', 'aborted'], true) ? $payment->expires_at?->toIso8601String() : null,
+                'transfer' => $payment?->status === 'pending' && $payment->method_code === 'bank_transfer' ? $this->payments->transferInstructions() : null,
+                // Pago con pasarela que se puede iniciar o reintentar mientras el pedido siga pendiente
+                'can_pay' => $order->status === 'pending' && $payment && $payment->method_code !== 'bank_transfer'
+                    && in_array($payment->status, ['pending', 'failed', 'aborted'], true)
+                    && $this->payments->isAvailable($payment->method_code),
+                'failure_reason' => in_array($payment?->status, ['failed', 'aborted'], true) ? $payment->failure_reason : null,
+                'card_last4' => $payment?->status === 'paid' ? $payment->card_last4 : null,
+                'payment_type' => $payment?->status === 'paid' && $payment->payment_type ? (WebpayPlusGateway::PAYMENT_TYPES[$payment->payment_type] ?? null) : null,
+                'installments' => $payment?->status === 'paid' && ($payment->installments ?? 0) > 1 ? $payment->installments : null,
+                'authorization_code' => $payment?->status === 'paid' ? $payment->authorization_code : null,
+                'refunded_amount' => $order->refunded_total,
             ],
             'document_type' => $order->document_type,
             'events' => $order->events->where('visible_to_customer', true)->map(fn (OrderEvent $e) => [

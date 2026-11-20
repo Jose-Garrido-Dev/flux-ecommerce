@@ -9,11 +9,16 @@ use App\Http\Controllers\Api\Storefront\V1\GeoController;
 use App\Http\Controllers\Api\Storefront\V1\MeController;
 use App\Http\Controllers\Api\Storefront\V1\OrderTrackingController;
 use App\Http\Controllers\Api\Storefront\V1\StoreController;
+use App\Http\Controllers\Webhooks\PaymentReturnController;
 use App\Http\Middleware\AuthenticateCustomer;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [HealthController::class, 'live']);
 Route::get('/health/ready', [HealthController::class, 'ready']);
+
+// Regreso del cliente desde la pasarela de pago (la pasarela lo envía por GET o POST, sin CSRF ni sesión)
+Route::match(['get', 'post'], '/pagos/{gateway}/retorno', PaymentReturnController::class)
+    ->where('gateway', '[a-z_]+')->middleware('throttle:60,1')->name('payments.return');
 
 // API pública para el storefront Next.js (contrato: packages/api-contract/openapi.yaml)
 Route::prefix('storefront/v1')->middleware('throttle:storefront')->group(function () {
@@ -40,6 +45,7 @@ Route::prefix('storefront/v1')->middleware('throttle:storefront')->group(functio
     Route::get('/checkout/options', [CheckoutController::class, 'options']);
     Route::post('/checkout', [CheckoutController::class, 'store']);
     Route::get('/orders/{token}', [OrderTrackingController::class, 'show']);
+    Route::post('/orders/{token}/pay', [OrderTrackingController::class, 'pay']);
 
     Route::prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);

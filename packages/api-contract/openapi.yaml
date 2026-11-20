@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Flux Storefront API
-  version: 0.6.0
+  version: 0.7.0
   description: >
     Contrato entre el backend Laravel y el storefront Next.js.
     Todo endpoint nuevo se agrega aquí antes de implementarse.
@@ -313,6 +313,8 @@ paths:
                       grand_total: { type: integer }
                       status: { type: string }
                       payment_status: { type: string }
+                      payment_method: { type: string }
+                      next: { type: string, enum: [pay, instructions], description: "pay: llevar al cliente a la pasarela con POST /orders/{token}/pay. instructions: mostrar los datos de transferencia" }
         "400": { description: "idempotency_key_required" }
         "404": { description: "cart_not_found" }
         "409": { description: "price_changed o cart_changed. Incluye `cart` con el resumen actualizado" }
@@ -324,6 +326,43 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: "#/components/schemas/Order" } } } } } }
         "404": { description: No existe }
+  /storefront/v1/orders/{token}/pay:
+    post:
+      summary: "Inicia o reintenta el pago con pasarela. Devuelve el formulario que el navegador debe enviar (POST) a la pasarela"
+      parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200":
+          description: "paid: true si el pedido ya estaba pagado (redirect null)"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      paid: { type: boolean }
+                      redirect:
+                        type: [object, "null"]
+                        properties:
+                          url: { type: string, description: URL de la pasarela }
+                          method: { type: string, enum: [POST, GET] }
+                          fields: { type: object, description: "Campos ocultos del formulario (Webpay: token_ws)" }
+        "404": { description: No existe }
+        "409": { description: "order_not_payable: el pedido no está pendiente de pago" }
+        "422": { description: "payment_unavailable: la pasarela no está activa y verificada" }
+        "502": { description: "gateway_error: la pasarela no respondió" }
+  /pagos/{gateway}/retorno:
+    get:
+      summary: "Regreso del cliente desde la pasarela (Webpay: token_ws, TBK_TOKEN o TBK_ORDEN_COMPRA). Confirma con la pasarela desde el servidor y redirige a la tienda. Idempotente"
+      parameters: [{ name: gateway, in: path, required: true, schema: { type: string, enum: [webpay_plus] } }]
+      responses:
+        "303": { description: "A {tienda}/pedido/{token}?pago=aprobado|rechazado|anulado|pendiente, o a {tienda}/pago/resultado?estado=desconocido" }
+    post:
+      summary: Igual que GET (Webpay vuelve por POST)
+      parameters: [{ name: gateway, in: path, required: true, schema: { type: string, enum: [webpay_plus] } }]
+      responses:
+        "303": { description: Igual que GET }
   /storefront/v1/auth/register:
     post:
       summary: Crea la cuenta, envía la confirmación de correo y devuelve el token (30 días)
@@ -674,10 +713,19 @@ components:
         payment:
           type: object
           properties:
-            method: { type: string }
-            status: { type: [string, "null"] }
+            method: { type: string, description: Nombre visible (Webpay, Transferencia bancaria) }
+            method_code: { type: [string, "null"], enum: [webpay_plus, bank_transfer, null] }
+            status: { type: [string, "null"], enum: [pending, paid, failed, aborted, expired, cancelled, null], description: Estado del último intento }
+            status_label: { type: [string, "null"] }
             expires_at: { type: [string, "null"], format: date-time }
-            transfer: { type: [object, "null"], description: Datos bancarios mientras el pago está pendiente }
+            transfer: { type: [object, "null"], description: Datos bancarios mientras el pago por transferencia está pendiente }
+            can_pay: { type: boolean, description: Se puede pagar o reintentar con la pasarela }
+            failure_reason: { type: [string, "null"] }
+            card_last4: { type: [string, "null"], description: Solo los 4 últimos dígitos }
+            payment_type: { type: [string, "null"], description: "Débito, Crédito, Prepago, cuotas..." }
+            installments: { type: [integer, "null"] }
+            authorization_code: { type: [string, "null"] }
+            refunded_amount: { type: integer }
         document_type: { type: string }
         events: { type: array, items: { type: object, properties: { type: { type: string }, label: { type: string }, at: { type: string } } } }
     Customer:

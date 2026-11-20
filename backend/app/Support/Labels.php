@@ -18,14 +18,14 @@ final class Labels
         'Role' => 'Rol', 'ModuleStatus' => 'Estado de módulo', 'Warehouse' => 'Bodega', 'InventoryItem' => 'Inventario de variante',
         'InventoryLevel' => 'Existencia', 'StockMovement' => 'Movimiento de inventario', 'StockTransfer' => 'Transferencia',
         'StockReservation' => 'Reserva de stock', 'Order' => 'Pedido', 'Customer' => 'Cliente', 'ShippingMethod' => 'Método de envío',
-        'Payment' => 'Pago', 'Address' => 'Dirección',
+        'Payment' => 'Pago', 'Address' => 'Dirección', 'PaymentGateway' => 'Pasarela de pago', 'Refund' => 'Reembolso',
     ];
 
     public const VERBS = [
         'created' => 'creación', 'updated' => 'modificación', 'deleted' => 'eliminación', 'completed' => 'completada',
         'login' => 'inicio de sesión', 'logout' => 'cierre de sesión', 'failed' => 'fallida',
         'placed' => 'creado', 'payment_confirmed' => 'pago confirmado', 'cancelled' => 'cancelado',
-        'blocked' => 'bloqueo', 'unblocked' => 'desbloqueo',
+        'blocked' => 'bloqueo', 'unblocked' => 'desbloqueo', 'refunded' => 'reembolso', 'payment_failed' => 'pago rechazado', 'verified' => 'verificación',
     ];
 
     public const ACTORS = ['user' => 'Usuario', 'system' => 'Sistema', 'provider' => 'Proveedor', 'customer' => 'Cliente'];

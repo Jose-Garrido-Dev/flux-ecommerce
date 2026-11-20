@@ -10,6 +10,7 @@ import { formatMoney, mediaUrl } from "@/lib/format";
 import { buttonClass } from "@/components/ui/Button";
 import { Alert, Field, fieldAria } from "@/components/ui/Field";
 import { useCart } from "@/components/cart/CartProvider";
+import { startPayment } from "@/lib/pay";
 import { AddressFields, emptyAddress, type AddressInput } from "./AddressFields";
 
 type Contact = { email: string; first_name: string; last_name: string; phone: string };
@@ -96,6 +97,7 @@ export function CheckoutForm({
   }, [regionCode, cart.subtotal]);
 
   const shipping = options?.shipping_methods.find((m) => m.code === shippingCode);
+  const payment = options?.payment_methods.find((m) => m.code === paymentCode);
   const isPickup = shipping?.type === "pickup";
   const total = cart.subtotal + (shipping?.amount ?? 0);
   const blocked = cart.items.some((l) => !l.purchasable || (l.max_quantity !== null && l.quantity > l.max_quantity));
@@ -110,7 +112,7 @@ export function CheckoutForm({
     setErrors({});
     setMessage(null);
 
-    const res = await bff<{ number: number; token: string }>("checkout", {
+    const res = await bff<{ number: number; token: string; next: "pay" | "instructions" }>("checkout", {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey.current },
       body: {
@@ -127,6 +129,13 @@ export function CheckoutForm({
 
     if (res.ok && res.data) {
       await refreshCart();
+      if (res.data.next === "pay") {
+        // Pago con pasarela: el pedido ya existe y el stock está apartado; ahora vamos a pagar
+        const pay = await startPayment(res.data.token);
+        if (pay.ok && !pay.paid) return; // el navegador se va al sitio de la pasarela
+        router.push(`/pedido/${res.data.token}${pay.ok ? "?pago=aprobado" : "?pago=error"}`);
+        return;
+      }
       router.push(`/pedido/${res.data.token}?nuevo=1`);
       return;
     }
@@ -246,7 +255,10 @@ export function CheckoutForm({
                   <label key={m.code} className={`flex cursor-pointer items-start gap-4 rounded-[var(--radius)] border p-4 ${paymentCode === m.code ? "border-fg bg-surface" : "border-border"}`}>
                     <input type="radio" name="pago" value={m.code} checked={paymentCode === m.code} onChange={() => setPaymentCode(m.code)} className="mt-1 accent-[var(--color-accent)]" />
                     <span>
-                      <span className="font-medium">{m.name}</span>
+                      <span className="flex flex-wrap items-center gap-2 font-medium">
+                        {m.name}
+                        {m.test_mode && <span className="rounded-full bg-sale/12 px-2 py-0.5 text-xs font-semibold text-sale">Modo de prueba: no se cobra</span>}
+                      </span>
                       <span className="mt-1 block text-sm text-muted">{m.description}</span>
                     </span>
                   </label>
@@ -340,10 +352,14 @@ export function CheckoutForm({
           </p>
         ) : (
           <button type="submit" disabled={sending || !shipping || noPayment || !paymentCode} className={buttonClass("primary", "mt-6 h-14 w-full text-base")}>
-            {sending ? "Confirmando…" : `Confirmar pedido por ${formatMoney(total)}`}
+            {sending ? (payment?.type === "redirect" ? "Te llevamos a pagar…" : "Confirmando…") : payment?.type === "redirect" ? `Pagar ${formatMoney(total)}` : `Confirmar pedido por ${formatMoney(total)}`}
           </button>
         )}
-        <p className="mt-3 text-center text-xs text-muted">Al confirmar reservamos tus productos mientras haces la transferencia.</p>
+        <p className="mt-3 text-center text-xs text-muted">
+          {payment?.type === "redirect"
+            ? `Pagas en el sitio seguro de ${payment.name}. Tus productos quedan reservados mientras pagas.`
+            : "Al confirmar reservamos tus productos mientras haces la transferencia."}
+        </p>
       </aside>
     </form>
   );

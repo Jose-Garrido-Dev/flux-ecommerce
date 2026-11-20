@@ -7,6 +7,7 @@ use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Models\StockMovement;
 use App\Domain\Inventory\Models\Warehouse;
 use App\Domain\Inventory\Services\InventoryService;
+use App\Domain\Orders\Models\Order;
 use App\Filament\Resources\StockMovements\Pages\ListStockMovements;
 use App\Filament\Support\InventoryActions;
 use App\Filament\Support\VariantPicker;
@@ -101,6 +102,9 @@ class StockMovementResource extends Resource
             ->emptyStateDescription('Cada entrada, salida, ajuste o transferencia queda registrada aquí.');
     }
 
+    /** @var array<string, int|string> número visible de cada pedido (uuid → número) */
+    private static array $orderNumbers = [];
+
     public static function reference(StockMovement $movement): ?string
     {
         return match ($movement->reference_type) {
@@ -109,7 +113,7 @@ class StockMovementResource extends Resource
             'transfer' => 'Transferencia #'.$movement->reference_id,
             'movement' => 'Revierte el movimiento #'.$movement->reference_id,
             'cart' => 'Carrito',
-            'order' => 'Pedido '.$movement->reference_id,
+            'order' => 'Pedido '.(self::$orderNumbers[$movement->reference_id] ??= Order::query()->where('uuid', $movement->reference_id)->value('number') ?? '(no encontrado)'),
             'import' => 'Importación',
             'document' => $movement->reference_id,
             default => $movement->reference_id,

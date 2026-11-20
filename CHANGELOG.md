@@ -17,6 +17,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ### Agregado
 
+- Fase 6 (pagos con Webpay Plus):
+  - Contrato común para pasarelas de pago y Webpay Plus (API REST v1.2 de Transbank).
+  - El pago se confirma siempre con Transbank desde el servidor, comparando monto y orden de compra. Volver dos veces de Webpay o recargar no cobra ni descuenta stock dos veces.
+  - Si el pago es rechazado o anulado, el cliente puede intentarlo de nuevo desde la página del pedido (cada intento usa una orden de compra nueva). El stock queda reservado 30 minutos por intento.
+  - Conciliación automática cada minuto de pagos sin regreso del cliente, y botón *Consultar en Webpay* en el pedido.
+  - Reembolsos totales y parciales desde el panel (Webpay y transferencia), con devolución de stock opcional en el reembolso total y correo al cliente.
+  - *Configuración → Pagos*: ambiente, credenciales cifradas, credenciales de prueba y **Probar conexión**. Webpay solo aparece en el checkout después de una prueba real exitosa. Comando `payments:verify`.
+  - Bitácora inmutable de cada llamada a la pasarela (sin número de tarjeta ni llaves).
+  - Prueba real automática contra el ambiente de integración de Transbank en GitHub Actions, con evidencia.
+  - API 0.7.0: `POST /orders/{token}/pay`, campos del pago en el pedido y retorno `/api/pagos/{pasarela}/retorno`.
+
 - Fase 5 (carrito, cuentas y checkout con transferencia):
   - Carrito de invitado y de cliente. Al ingresar, el carrito de invitado se une al de la cuenta. El navegador solo envía SKU y cantidad: los precios los calcula siempre el servidor, y el carrito avisa si un precio cambió o si un producto ya no está disponible.
   - Checkout en una página: contacto, dirección, despacho, pago, boleta o factura y comentarios. El total que ve el cliente solo sirve para avisarle si algo cambió; el pedido se cobra con el total recalculado. Una clave de idempotencia evita pedidos duplicados al reintentar.

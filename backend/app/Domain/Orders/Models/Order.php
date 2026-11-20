@@ -3,6 +3,7 @@
 namespace App\Domain\Orders\Models;
 
 use App\Domain\Customers\Models\Customer;
+use App\Domain\Payments\Models\Refund;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,7 +18,7 @@ class Order extends Model
 
     public const STATUSES = ['pending' => 'Pendiente de pago', 'processing' => 'En preparación', 'completed' => 'Completado', 'cancelled' => 'Cancelado'];
 
-    public const PAYMENT_STATUSES = ['pending' => 'Pendiente', 'paid' => 'Pagado', 'expired' => 'Vencido', 'cancelled' => 'Anulado', 'refunded' => 'Reembolsado'];
+    public const PAYMENT_STATUSES = ['pending' => 'Pendiente', 'paid' => 'Pagado', 'expired' => 'Vencido', 'cancelled' => 'Anulado', 'refunded' => 'Reembolsado', 'partially_refunded' => 'Reembolso parcial'];
 
     public const FULFILLMENT_STATUSES = ['unfulfilled' => 'Por preparar', 'preparing' => 'En preparación', 'shipped' => 'Despachado', 'delivered' => 'Entregado', 'picked_up' => 'Retirado'];
 
@@ -83,6 +84,11 @@ class Order extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class)->orderBy('id');
+    }
+
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class)->orderBy('id');
     }
 
     public function latestPayment(): HasOne

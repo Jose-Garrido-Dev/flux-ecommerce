@@ -145,7 +145,7 @@ export type ShippingOption = {
   pickup_address: string | null;
 };
 
-export type PaymentOption = { code: string; name: string; description: string };
+export type PaymentOption = { code: string; name: string; description: string; type?: "redirect" | "manual"; test_mode?: boolean };
 
 export type CheckoutOptions = { shipping_methods: ShippingOption[]; payment_methods: PaymentOption[]; subtotal: number };
 
@@ -189,7 +189,22 @@ export type OrderDetail = {
   tax_total: number;
   grand_total: number;
   shipping: { method: string | null; type: string | null; estimated_days: string | null; address: OrderAddress | null };
-  payment: { method: string; status: string | null; expires_at: string | null; transfer: TransferInstructions | null };
+  payment: {
+    method: string;
+    method_code: string | null;
+    status: string | null;
+    status_label: string | null;
+    expires_at: string | null;
+    transfer: TransferInstructions | null;
+    /** Pago con pasarela que se puede iniciar o reintentar */
+    can_pay: boolean;
+    failure_reason: string | null;
+    card_last4: string | null;
+    payment_type: string | null;
+    installments: number | null;
+    authorization_code: string | null;
+    refunded_amount: number;
+  };
   document_type: string | null;
   events: { type: string; label: string; at: string | null }[];
 };
