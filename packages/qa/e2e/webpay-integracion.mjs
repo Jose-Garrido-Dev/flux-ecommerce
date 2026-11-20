@@ -148,16 +148,16 @@ async function pagarConTarjeta(page, caso, tarjeta, decisionBanco) {
   await fill(page, ["#card-number", "input[name=cardNumber]", 'input[autocomplete="cc-number"]', 'input[placeholder*="número" i]', 'input[placeholder*="numero" i]'], tarjeta.number, "número de tarjeta");
   await page.waitForTimeout(800);
   await evidencia(page, caso, "tarjeta-ingresada");
-  const exp = await find(page, ["#card-exp", "input[name=cardExpiration]", 'input[autocomplete="cc-exp"]', 'input[placeholder*="MM" i]'], 8000);
-  if (exp) {
-    await exp.click();
-    await exp.pressSequentially("1230", { delay: 40 });
+  // Fecha y CVV aparecen después de validar el número
+  for (const [sel, valor, nombre] of [["#card-exp", "1230", "vencimiento"], ["#card-cvv", tarjeta.cvv, "CVV"]]) {
+    const campo = page.locator(sel);
+    await campo.waitFor({ state: "visible", timeout: 20000 }).catch(() => {});
+    assert(await campo.isVisible(), `no apareció el campo ${nombre}`);
+    await campo.click();
+    await campo.pressSequentially(valor, { delay: 60 });
+    await campo.press("Tab");
   }
-  const cvv = await find(page, ["#card-cvv", "input[name=cvv]", 'input[autocomplete="cc-csc"]', 'input[placeholder*="CVV" i]'], 8000);
-  if (cvv) {
-    await cvv.click();
-    await cvv.pressSequentially(tarjeta.cvv, { delay: 40 });
-  }
+  await page.waitForTimeout(800);
   // Cuotas: si aparece un selector, se deja la opción por defecto
   await evidencia(page, caso, "datos-tarjeta");
   await click(page, ["button.submit", "button[type=submit]", ...hasText("Pagar"), ...hasText("Continuar")], "el botón Pagar");
