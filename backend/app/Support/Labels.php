@@ -17,12 +17,15 @@ final class Labels
         'TaxClass' => 'Impuesto', 'Region' => 'Región', 'Commune' => 'Comuna', 'Setting' => 'Configuración', 'User' => 'Usuario',
         'Role' => 'Rol', 'ModuleStatus' => 'Estado de módulo', 'Warehouse' => 'Bodega', 'InventoryItem' => 'Inventario de variante',
         'InventoryLevel' => 'Existencia', 'StockMovement' => 'Movimiento de inventario', 'StockTransfer' => 'Transferencia',
-        'StockReservation' => 'Reserva de stock',
+        'StockReservation' => 'Reserva de stock', 'Order' => 'Pedido', 'Customer' => 'Cliente', 'ShippingMethod' => 'Método de envío',
+        'Payment' => 'Pago', 'Address' => 'Dirección',
     ];
 
     public const VERBS = [
         'created' => 'creación', 'updated' => 'modificación', 'deleted' => 'eliminación', 'completed' => 'completada',
         'login' => 'inicio de sesión', 'logout' => 'cierre de sesión', 'failed' => 'fallida',
+        'placed' => 'creado', 'payment_confirmed' => 'pago confirmado', 'cancelled' => 'cancelado',
+        'blocked' => 'bloqueo', 'unblocked' => 'desbloqueo',
     ];
 
     public const ACTORS = ['user' => 'Usuario', 'system' => 'Sistema', 'provider' => 'Proveedor', 'customer' => 'Cliente'];

@@ -116,6 +116,31 @@ class SpanishOnlyModalsTest extends TestCase
         $this->check('Variantes: inventario', Livewire::test(VariantsRelationManager::class, $owner)->mountTableAction('stockMovement', $variant));
         $this->check('Producto: registrar movimiento', Livewire::test(EditProduct::class, ['record' => $product->getRouteKey()])->mountAction('stockMovement'));
 
+        // Ventas, clientes, envíos y pagos
+        app(\App\Domain\System\Services\SettingsRepository::class)->putMany('payments', [
+            'bank_transfer_enabled' => true, 'bank_name' => 'Banco', 'account_type' => 'Cuenta corriente', 'account_number' => '1',
+            'account_holder' => 'Tienda', 'account_rut' => '76.123.456-0',
+        ]);
+        \App\Domain\Shipping\Models\ShippingMethod::query()->create(['code' => 'domicilio', 'name' => 'Despacho', 'type' => 'flat', 'amount' => 3990]);
+        $inventory->move($variant, Warehouse::default(), MovementType::PurchaseIn, 5, 'Compra');
+        [$cart] = app(\App\Domain\Cart\Services\CartService::class)->create();
+        app(\App\Domain\Cart\Services\CartService::class)->setQuantity($cart, $variant->sku, 1);
+        $order = app(\App\Domain\Orders\Services\PlaceOrder::class)->handle($cart, [
+            'email' => 'ana@correo.cl', 'first_name' => 'Ana', 'last_name' => 'Pérez', 'phone' => '912345678',
+            'shipping_method' => 'domicilio', 'payment_method' => 'bank_transfer',
+            'address' => ['recipient' => 'Ana', 'phone' => '912345678', 'street' => 'Los Leones', 'number' => '1', 'region_code' => 'CL-RM', 'commune' => 'Providencia'],
+        ], null, 'clave');
+        $customer = \App\Domain\Customers\Models\Customer::query()->create(['first_name' => 'Ana', 'last_name' => 'Pérez', 'email' => 'ana@correo.cl', 'password' => 'clave1234']);
+        $viewOrder = fn () => Livewire::test(\App\Filament\Resources\Orders\Pages\ViewOrder::class, ['record' => $order->getRouteKey()]);
+        $this->check('Pedido: confirmar pago', $viewOrder()->mountAction('confirmPayment'));
+        $this->check('Pedido: confirmar pago con monto distinto', $viewOrder()->callAction('confirmPayment', data: ['amount' => 1]));
+        $this->check('Pedido: cancelar (vacío)', $viewOrder()->callAction('cancel', data: []));
+        $this->check('Pedidos: filtros', Livewire::test(\App\Filament\Resources\Orders\Pages\ListOrders::class)->filterTable('status', 'pending'));
+        $this->check('Cliente: bloquear', Livewire::test(\App\Filament\Resources\Customers\Pages\ViewCustomer::class, ['record' => $customer->getRouteKey()])->mountAction('block'));
+        $this->check('Envíos: nuevo', Livewire::test(\App\Filament\Resources\ShippingMethods\Pages\ManageShippingMethods::class)->mountAction('create'));
+        $this->check('Envíos: nuevo (vacío)', Livewire::test(\App\Filament\Resources\ShippingMethods\Pages\ManageShippingMethods::class)->callAction('create', data: ['type' => null]));
+        $this->check('Pagos (vacío)', Livewire::test(\App\Filament\Pages\PaymentSettingsPage::class)->fillForm(['bank_transfer_enabled' => true, 'bank_transfer_hours' => null])->call('save'));
+
         $this->assertSame([], array_values(array_unique($this->problems)),
             "Texto en inglés en modales o validaciones:\n".implode("\n", array_unique($this->problems)));
     }

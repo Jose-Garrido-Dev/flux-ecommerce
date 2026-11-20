@@ -45,7 +45,25 @@ class SpanishOnlyAdminTest extends TestCase
         $inventory->move($variant, $main, MovementType::PurchaseIn, 10, 'Compra', 'document', 'Factura 1');
         $transfer = $inventory->transfer($main, $store, [['variant_id' => $variant->id, 'quantity' => 2]], 'Reposición');
         $inventory->reserve($variant, 1, 'cart', 'carrito-prueba');
+        // Ventas: un pedido de invitado, un cliente registrado y un método de envío
+        app(\App\Domain\System\Services\SettingsRepository::class)->putMany('payments', [
+            'bank_transfer_enabled' => true, 'bank_name' => 'Banco', 'account_type' => 'Cuenta corriente', 'account_number' => '1',
+            'account_holder' => 'Tienda', 'account_rut' => '76.123.456-0',
+        ]);
+        \App\Domain\Shipping\Models\ShippingMethod::query()->create(['code' => 'domicilio', 'name' => 'Despacho', 'type' => 'flat', 'amount' => 3990]);
+        $customer = \App\Domain\Customers\Models\Customer::query()->create(['first_name' => 'Ana', 'last_name' => 'Pérez', 'email' => 'ana@correo.cl', 'password' => 'clave1234']);
+        $customer->addresses()->create(['recipient' => 'Ana', 'phone' => '912345678', 'street' => 'Los Leones', 'number' => '1', 'region_id' => Region::query()->first()->id, 'commune' => 'Providencia', 'is_default' => true]);
+        [$cart] = app(\App\Domain\Cart\Services\CartService::class)->create($customer);
+        app(\App\Domain\Cart\Services\CartService::class)->setQuantity($cart, $variant->sku, 1);
+        $order = app(\App\Domain\Orders\Services\PlaceOrder::class)->handle($cart, [
+            'email' => 'ana@correo.cl', 'first_name' => 'Ana', 'last_name' => 'Pérez', 'phone' => '912345678',
+            'shipping_method' => 'domicilio', 'payment_method' => 'bank_transfer', 'document_type' => 'factura',
+            'billing_rut' => '76.123.456-0', 'billing_name' => 'Empresa SpA', 'billing_activity' => 'Comercio',
+            'address' => ['recipient' => 'Ana', 'phone' => '912345678', 'street' => 'Los Leones', 'number' => '1', 'region_code' => 'CL-RM', 'commune' => 'Providencia'],
+        ], $customer, 'clave');
+        app(\App\Domain\Orders\Services\OrderPayments::class)->confirm($order, $order->grand_total, 'OP-1');
         $records = [
+            'orders' => $order, 'customers' => $customer,
             'stock-transfers' => $transfer,
             'products' => $product, 'categories' => $category, 'brands' => $brand,
             'attributes' => Attribute::query()->first(), 'users' => $admin, 'regions' => Region::query()->first(),
