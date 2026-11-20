@@ -69,6 +69,7 @@ async function evidencia(page, caso, paso) {
   const dir = path.join(OUT, caso);
   mkdirSync(dir, { recursive: true });
   const n = String((evidencia.n = (evidencia.n ?? 0) + 1)).padStart(2, "0");
+  console.log(`  · ${caso} ${n} ${paso}: ${page.url()}`);
   await page.screenshot({ path: path.join(dir, `${n}-${paso}.png`), fullPage: true }).catch(() => {});
   for (const frame of page.frames()) {
     const html = await frame.content().catch(() => "");
@@ -163,6 +164,7 @@ async function pagarConTarjeta(page, caso, tarjeta, decisionBanco) {
 
   // Simulador del banco de pruebas: RUT y clave, luego Aceptar o Rechazar
   const rut = await find(page, ["#rutClient", "input[name=rutClient]", 'input[name*="rut" i]'], 45000);
+  if (!rut) console.log(`Sin simulador del banco en ${page.url()}:\n${await describir(page)}`);
   if (rut) {
     await evidencia(page, caso, "banco-autenticacion");
     await rut.fill(RUT.replace(/[.-]/g, ""));
@@ -180,7 +182,13 @@ async function pagarConTarjeta(page, caso, tarjeta, decisionBanco) {
 }
 
 async function volverALaTienda(page, caso) {
-  await page.waitForURL((u) => u.toString().startsWith(STORE), { timeout: 90000 });
+  try {
+    await page.waitForURL((u) => u.toString().startsWith(STORE), { timeout: 90000 });
+  } catch (e) {
+    await evidencia(page, caso, "sin-regreso");
+    console.log(`No volvió a la tienda. Página actual ${page.url()}:\n${await describir(page)}`);
+    throw e;
+  }
   await page.waitForLoadState("networkidle").catch(() => {});
   await evidencia(page, caso, "regreso-a-la-tienda");
   return new URL(page.url());
