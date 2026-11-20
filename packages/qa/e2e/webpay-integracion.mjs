@@ -265,7 +265,19 @@ await caso("rechazado y luego aprobado en el mismo pedido", async () => {
   assert(e2.eventos.filter((t) => t === "payment_confirmed").length === 1, "el pago se registra una sola vez");
 
   // Reembolso parcial real en Transbank
-  const reembolso = json(datos("reembolso", pedido.number, "1000"));
+  // El ambiente de integración a veces tarda en reconocer una transacción recién confirmada
+  // ("Transaction not found"). Un reembolso rechazado no cambia nada, así que se reintenta.
+  let reembolso;
+  for (let intento = 1; ; intento++) {
+    try {
+      reembolso = json(datos("reembolso", pedido.number, "1000"));
+      break;
+    } catch (e) {
+      if (intento >= 4 || !/Transaction not found/.test(e.message)) throw e;
+      console.log(`    reembolso: Transbank aún no reconoce la transacción (intento ${intento}), se espera 15 s`);
+      await new Promise((r) => setTimeout(r, 15000));
+    }
+  }
   const e3 = estado(pedido.number);
   assert(e3.pedido.payment_status === "partially_refunded" && e3.pedido.refunded_total === 1000, "reembolso parcial aplicado");
   await page.close();
