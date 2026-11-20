@@ -145,6 +145,8 @@ async function irAWebpay(page, caso, token, boton) {
   await page.getByRole("button", { name: boton }).click();
   await page.waitForURL(/transbank\.cl/, { timeout: 60000 });
   await page.waitForLoadState("networkidle").catch(() => {});
+  // El formulario de integración a veces tarda en dibujarse
+  await page.locator("button.btn-return").first().waitFor({ state: "visible", timeout: 60000 }).catch(() => {});
   await evidencia(page, caso, "formulario-webpay");
 }
 
