@@ -30,9 +30,20 @@ const resumen = { inicio: new Date().toISOString(), casos: [] };
 mkdirSync(OUT, { recursive: true });
 
 function datos(...args) {
-  return execFileSync("php", [HELPER, ...args], { encoding: "utf8" }).trim();
+  try {
+    return execFileSync("php", [HELPER, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  } catch (e) {
+    throw new Error(`php webpay-datos.php ${args.join(" ")}: ${String(e.stderr || e.stdout || e.message).trim().slice(0, 500)}`);
+  }
 }
-const estado = (numero) => JSON.parse(datos("estado", numero));
+function json(texto) {
+  try {
+    return JSON.parse(texto);
+  } catch {
+    throw new Error(`respuesta no válida del ayudante: ${texto.slice(0, 500)}`);
+  }
+}
+const estado = (numero) => json(datos("estado", numero));
 
 function assert(cond, msg) {
   if (!cond) throw new Error(`Falló: ${msg}`);
@@ -254,7 +265,7 @@ await caso("rechazado y luego aprobado en el mismo pedido", async () => {
   assert(e2.eventos.filter((t) => t === "payment_confirmed").length === 1, "el pago se registra una sola vez");
 
   // Reembolso parcial real en Transbank
-  const reembolso = JSON.parse(datos("reembolso", pedido.number, "1000"));
+  const reembolso = json(datos("reembolso", pedido.number, "1000"));
   const e3 = estado(pedido.number);
   assert(e3.pedido.payment_status === "partially_refunded" && e3.pedido.refunded_total === 1000, "reembolso parcial aplicado");
   await page.close();

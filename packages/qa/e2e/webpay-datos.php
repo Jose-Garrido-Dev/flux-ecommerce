@@ -27,6 +27,7 @@ if (app()->isProduction()) {
 
 [$_, $mode, $number, $amount] = $argv + [null, null, null, null];
 
+try {
 switch ($mode) {
     case 'preparar':
         ShippingMethod::query()->updateOrCreate(['code' => 'retiro'], ['name' => 'Retiro en tienda', 'type' => 'pickup', 'amount' => 0, 'status' => 'active']);
@@ -59,5 +60,9 @@ switch ($mode) {
     default:
         fwrite(STDERR, "Uso: php webpay-datos.php preparar | estado <número> | reembolso <número> <monto>\n");
         exit(1);
+}
+} catch (Throwable $e) {
+    fwrite(STDERR, get_class($e).': '.$e->getMessage()."\n");
+    exit(1);
 }
 echo "\n";
