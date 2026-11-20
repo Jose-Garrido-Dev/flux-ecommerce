@@ -29,7 +29,7 @@ if (app()->isProduction()) {
 
 switch ($mode) {
     case 'preparar':
-        ShippingMethod::query()->firstOrCreate(['code' => 'retiro'], ['name' => 'Retiro en tienda', 'type' => 'pickup', 'amount' => 0]);
+        ShippingMethod::query()->updateOrCreate(['code' => 'retiro'], ['name' => 'Retiro en tienda', 'type' => 'pickup', 'amount' => 0, 'status' => 'active']);
         $variantId = InventoryLevel::query()->selectRaw('variant_id, sum(on_hand - reserved) as libre')
             ->groupBy('variant_id')->havingRaw('sum(on_hand - reserved) >= 5')->orderBy('variant_id')->value('variant_id');
         echo ProductVariant::query()->findOrFail($variantId)->sku;

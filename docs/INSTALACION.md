@@ -35,7 +35,7 @@ Esta guía explica qué hay que instalar, qué hay que configurar y cómo dejar 
 | Worker | `php artisan queue:work` | Procesa las colas | servicio `worker` |
 | Scheduler | `php artisan schedule:work` | Tareas programadas (reservas vencidas, informes, respaldos) | servicio `scheduler` |
 
-**Todo corre en tu propio servidor.** La configuración por defecto no necesita contratar ningún servicio externo: ni Redis, ni S3, ni buscadores pagados. Redis, Meilisearch y S3 existen solo como opciones para tiendas muy grandes (sección 8.2). Los únicos servicios externos son los que el negocio necesita por naturaleza: pasarela de pago, courier y correo (sección 8).
+**Todo corre en tu propio servidor.** La configuración por defecto no necesita contratar ningún servicio externo: ni Redis, ni S3, ni buscadores pagados. Redis, Meilisearch y S3 existen solo como opciones para tiendas muy grandes (sección 8.3). Los únicos servicios externos son los que el negocio necesita por naturaleza: pasarela de pago, courier y correo (sección 8).
 
 La arquitectura completa, el esquema de base de datos y los flujos están en el documento de diseño técnico (ver [docs/arquitectura.md](arquitectura.md)).
 
@@ -207,13 +207,13 @@ Nunca subas archivos `.env` al repositorio: contienen claves. El `.gitignore` ya
 | `DB_CONNECTION` | `pgsql` | Motor de base de datos |
 | `DB_HOST` / `DB_PORT` | `postgres` / `5432` | En Docker el host es el nombre del servicio |
 | `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` | | Credenciales de la base |
-| `CACHE_STORE` / `QUEUE_CONNECTION` / `SESSION_DRIVER` | `database` | Caché, colas y sesiones en la base de datos (sin servicios extra). `redis` solo si activas Redis (sección 8.2) |
+| `CACHE_STORE` / `QUEUE_CONNECTION` / `SESSION_DRIVER` | `database` | Caché, colas y sesiones en la base de datos (sin servicios extra). `redis` solo si activas Redis (sección 8.3) |
 | `SESSION_DOMAIN` | `.mitienda.cl` | Permite compartir la sesión entre `www` y `api` |
 | `SANCTUM_STATEFUL_DOMAINS` | `www.mitienda.cl,mitienda.cl` | Dominios del storefront que pueden iniciar sesión de clientes |
 | `MAIL_MAILER` | `smtp` | Forma de envío de correo |
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_ENCRYPTION` | | Datos del proveedor SMTP (en desarrollo: `mailpit`, `1025`) |
 | `MAIL_FROM_ADDRESS` / `MAIL_FROM_NAME` | `ventas@mitienda.cl` | Remitente de los correos |
-| `SCOUT_DRIVER` | `database` | Motor de búsqueda. `meilisearch` solo si lo activas (sección 8.2) |
+| `SCOUT_DRIVER` | `database` | Motor de búsqueda. `meilisearch` solo si lo activas (sección 8.3) |
 | `FILESYSTEM_DISK` | `local` | Archivos en el disco del servidor. `s3` es opcional |
 | `REDIS_*`, `MEILISEARCH_*`, `AWS_*` | vacías | Solo si activas esos servicios opcionales |
 | `LOG_CHANNEL` / `LOG_LEVEL` | `stack` / `warning` | Registros. En producción `warning` o `error` |
@@ -423,6 +423,8 @@ El panel mostrará una alerta si el scheduler deja de reportar actividad.
 
 **Pedidos por transferencia sin pagar.** Cada minuto el scheduler ejecuta `orders:expire-unpaid`: anula los pedidos cuyo plazo de pago venció (48 horas por defecto, se cambia en *Configuración → Pagos*) y devuelve su stock a la venta. Sin scheduler, esos productos siguen apartados.
 
+**Pagos con Webpay pendientes.** El mismo comando `orders:expire-unpaid` consulta primero a Transbank los pagos que quedaron sin respuesta (el cliente pagó y cerró el navegador antes de volver a la tienda) y los confirma o los da por no completados. Sin scheduler, esos pedidos quedan pendientes hasta que alguien pulse *Consultar en Webpay* en el pedido.
+
 **Correos de la tienda.** La confirmación del pedido, el aviso de pago recibido, el aviso de pedido nuevo para la tienda, la confirmación de correo y la recuperación de contraseña se envían por la cola. Si no llegan, revisa que el worker esté corriendo.
 
 **Importaciones de productos.** Las importaciones de CSV o Excel corren en el worker de colas. Si una importación se queda en "En cola" más de un minuto, el worker no está corriendo. En desarrollo sin Docker, ábrelo en otra terminal con `php artisan queue:work`.
@@ -459,10 +461,10 @@ Ninguna integración se considera operativa hasta que se prueba con credenciales
 
 | Servicio | Para qué | Qué conseguir | Dónde se configurará | Estado |
 | --- | --- | --- | --- | --- |
-| Transbank Webpay Plus | Pago con tarjetas | Código de comercio y API Key secret (Transbank entrega credenciales de integración públicas para pruebas y las de producción tras el proceso de afiliación) | Panel → Configuración → Pagos | Pendiente (Fase 6) |
-| Mercado Pago | Pagos | Access token y public key de una cuenta de vendedor; usuarios de prueba | Panel → Configuración → Pagos | Pendiente (Fase 6) |
-| Flow | Pagos | API Key y Secret Key (sandbox en sandbox.flow.cl) | Panel → Configuración → Pagos | Pendiente (Fase 6) |
-| Khipu | Transferencia simplificada | ID de cobrador y llave secreta | Panel → Configuración → Pagos | Pendiente (Fase 6) |
+| Transbank Webpay Plus | Pago con tarjetas | Código de comercio y API Key secret (Transbank entrega credenciales de integración públicas para pruebas y las de producción tras el proceso de afiliación) | Panel → Configuración → Pagos | Disponible (Fase 6). Verificada en el ambiente de integración: ver sección 8.2 |
+| Mercado Pago | Pagos | Access token y public key de una cuenta de vendedor; usuarios de prueba | Panel → Configuración → Pagos | Pendiente: requiere una cuenta de prueba propia. No verificada |
+| Flow | Pagos | API Key y Secret Key (sandbox en sandbox.flow.cl) | Panel → Configuración → Pagos | Pendiente: requiere una cuenta de prueba propia. No verificada |
+| Khipu | Transferencia simplificada | ID de cobrador y llave secreta | Panel → Configuración → Pagos | Pendiente: requiere una cuenta de prueba propia. No verificada |
 | Transferencia bancaria | Pago manual | Datos de la cuenta bancaria de la empresa | Panel → Configuración → Pagos | Disponible (Fase 5). No usa servicios externos: el pago se confirma a mano en el panel |
 | Chilexpress / Starken / Blue Express | Cotizar, generar etiquetas y tracking | Contrato comercial y credenciales de API con cada courier | Panel → Configuración → Envíos | Pendiente (Fase 7) |
 | Correo transaccional | Confirmaciones, recuperación de contraseña | Cuenta SMTP o API (Resend, Postmark, Amazon SES, Brevo) y registros SPF, DKIM y DMARC en el DNS | `backend/.env` (Fase 1) y panel (Fase 8) | Configurable vía `.env` |
@@ -479,7 +481,31 @@ Para que los correos no lleguen a spam, el proveedor de correo te dará valores 
 - **DKIM** (uno o más registros TXT o CNAME)
 - **DMARC** (TXT en `_dmarc.mitienda.cl`, por ejemplo `v=DMARC1; p=quarantine; rua=mailto:dmarc@mitienda.cl`)
 
-### 8.2 Servicios opcionales (no necesarios para empezar)
+### 8.2 Webpay Plus (Transbank)
+
+No hay que instalar nada: Flux habla directo con la API REST de Transbank (v1.2) desde el servidor.
+
+**Requisitos del servidor**
+- Salida a internet por HTTPS hacia `webpay3gint.transbank.cl` (integración) y `webpay3g.transbank.cl` (producción).
+- `APP_URL` en `backend/.env` con la dirección pública del backend. Transbank devuelve al cliente a `APP_URL/api/pagos/webpay_plus/retorno`; en producción debe ser HTTPS.
+- `FLUX_STOREFRONT_URL` con la dirección pública de la tienda: después de confirmar el pago, el cliente llega a `/pedido/...` en la tienda.
+- El scheduler corriendo (sección 7.1) para recuperar pagos sin regreso.
+
+**Probar en el ambiente de integración (sin cobrar)**
+1. Panel → *Configuración → Pagos* → **Cargar credenciales de prueba** y **Probar conexión con Webpay**. O desde el servidor:
+   ```bash
+   docker compose -f compose.prod.yml --env-file .env exec app php artisan payments:verify webpay_plus --integration --enable
+   ```
+2. Compra en la tienda y paga con las tarjetas de prueba públicas de Transbank:
+   - Aprobada: Visa `4051 8856 0044 6623`, CVV `123`, cualquier fecha futura.
+   - Rechazada: Mastercard `5186 0595 5959 0568`, CVV `123`.
+   - En el simulador del banco: RUT `11.111.111-1`, clave `123`, y elige *Aceptar* o *Rechazar*.
+
+**Pasar a producción:** ver el manual *Medios de pago* del panel (afiliación, validación con Transbank, credenciales de producción y nueva prueba de conexión).
+
+**Prueba automática real.** El flujo `.github/workflows/pasarelas.yml` corre en GitHub Actions contra el ambiente de integración: compra, pago rechazado, reintento aprobado, anulación, regreso duplicado y reembolso parcial. Deja capturas y un resumen como artefacto *evidencia-webpay*. Corre cuando cambia el código de pagos, cada lunes y a pedido (*Actions → Pasarelas (prueba real) → Run workflow*).
+
+### 8.3 Servicios opcionales (no necesarios para empezar)
 
 Por defecto Flux no usa ninguno de estos servicios. Solo valen la pena en tiendas con mucho tráfico o catálogos muy grandes, y los tres **pueden correr en tu misma VPS** sin contratar nada:
 
