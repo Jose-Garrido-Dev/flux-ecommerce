@@ -16,4 +16,5 @@ Schedule::job(new RecordWorkerHeartbeat)->everyMinute();
 Schedule::command('queue:prune-failed --hours=720')->daily();
 
 // Libera el stock de reservas vencidas (carritos o pedidos sin pagar)
+Schedule::command('orders:expire-unpaid')->everyMinute()->withoutOverlapping();
 Schedule::command('inventory:expire-reservations')->everyMinute()->withoutOverlapping();

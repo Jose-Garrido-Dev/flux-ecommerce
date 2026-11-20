@@ -6,6 +6,8 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { AnnouncementBar } from "@/components/site/AnnouncementBar";
 import { RevealObserver } from "@/components/motion/RevealObserver";
+import { CartProvider } from "@/components/cart/CartProvider";
+import { CartDrawer } from "@/components/cart/CartDrawer";
 
 /*
  * Bricolage Grotesque (licencia OFL, archivo en src/app/fonts). Fuente variable de peso y ancho.
@@ -48,12 +50,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
       </head>
       <body className="flex min-h-dvh flex-col antialiased">
-        <AnnouncementBar messages={store?.announcements ?? []} />
-        <Header storeName={store?.name ?? "Tienda"} menu={menu} />
-        <main id="contenido" className="flex-1">
-          {children}
-        </main>
-        <Footer store={store} menu={menu} />
+        <CartProvider>
+          <AnnouncementBar messages={store?.announcements ?? []} />
+          <Header storeName={store?.name ?? "Tienda"} menu={menu} />
+          <main id="contenido" className="flex-1">
+            {children}
+          </main>
+          <Footer store={store} menu={menu} />
+          <CartDrawer />
+        </CartProvider>
         <RevealObserver />
       </body>
     </html>

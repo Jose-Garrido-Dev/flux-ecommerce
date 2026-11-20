@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Flux Storefront API
-  version: 0.5.0
+  version: 0.6.0
   description: >
     Contrato entre el backend Laravel y el storefront Next.js.
     Todo endpoint nuevo se agrega aquí antes de implementarse.
@@ -169,7 +169,291 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+  # ---------- Fase 5: carrito, checkout, pedidos y cuentas ----------
+  # El navegador no llama estas rutas directamente: pasa por el puente /api/tienda de Next.js,
+  # que guarda los tokens en cookies httpOnly y los reenvía como X-Cart-Token y Authorization.
+  /storefront/v1/geo/regions:
+    get:
+      summary: Regiones habilitadas y sus comunas (vacío hasta cargar el listado oficial)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code: { type: string, example: CL-RM }
+                        name: { type: string }
+                        communes: { type: array, items: { type: string } }
+  /storefront/v1/cart:
+    get:
+      summary: Carrito actual (del token X-Cart-Token o del cliente autenticado)
+      parameters: [{ $ref: "#/components/parameters/CartToken" }]
+      security: [{}, { customerToken: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+  /storefront/v1/cart/items:
+    post:
+      summary: Agrega unidades. Si no hay carrito lo crea y entrega su token una sola vez en `token`
+      parameters: [{ $ref: "#/components/parameters/CartToken" }]
+      security: [{}, { customerToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sku, quantity]
+              properties:
+                sku: { type: string }
+                quantity: { type: integer, minimum: 1, maximum: 99 }
+      responses:
+        "201": { $ref: "#/components/responses/Cart" }
+        "422": { description: Producto no disponible, sin precio o sin stock suficiente }
+  /storefront/v1/cart/items/{sku}:
+    parameters:
+      - { name: sku, in: path, required: true, schema: { type: string } }
+      - { $ref: "#/components/parameters/CartToken" }
+    patch:
+      summary: Cambia la cantidad (0 = quitar)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [quantity], properties: { quantity: { type: integer, minimum: 0, maximum: 99 } } }
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+        "404": { description: "cart_not_found" }
+    delete:
+      summary: Quita el producto del carrito
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+        "404": { description: "cart_not_found" }
+  /storefront/v1/checkout/options:
+    get:
+      summary: Métodos de despacho para la región y medios de pago activos
+      parameters:
+        - { name: region_code, in: query, schema: { type: string, example: CL-RM } }
+        - { $ref: "#/components/parameters/CartToken" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      shipping_methods: { type: array, items: { $ref: "#/components/schemas/ShippingOption" } }
+                      payment_methods:
+                        type: array
+                        items: { type: object, properties: { code: { type: string, example: bank_transfer }, name: { type: string }, description: { type: string } } }
+                      subtotal: { type: integer }
+  /storefront/v1/checkout:
+    post:
+      summary: Crea el pedido pendiente de pago. Los precios se recalculan en el servidor
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, maxLength: 100 }, description: Misma clave = mismo pedido (reintentos seguros) }
+        - { $ref: "#/components/parameters/CartToken" }
+      security: [{}, { customerToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, first_name, last_name, phone, shipping_method, payment_method, accepts_terms]
+              properties:
+                email: { type: string, format: email }
+                first_name: { type: string }
+                last_name: { type: string }
+                phone: { type: string }
+                shipping_method: { type: string }
+                payment_method: { type: string, enum: [bank_transfer] }
+                address:
+                  type: object
+                  description: Obligatoria salvo en retiro en tienda
+                  properties:
+                    recipient: { type: string }
+                    phone: { type: string }
+                    street: { type: string }
+                    number: { type: string }
+                    apartment: { type: [string, "null"] }
+                    region_code: { type: string }
+                    commune: { type: string, description: Si ya se cargaron las comunas oficiales, debe pertenecer a la región }
+                    reference: { type: [string, "null"] }
+                document_type: { type: string, enum: [boleta, factura] }
+                billing_rut: { type: string, description: Obligatorio con factura }
+                billing_name: { type: string }
+                billing_activity: { type: string }
+                notes: { type: string, maxLength: 500 }
+                accepts_terms: { type: boolean }
+                expected_total: { type: integer, description: Total que vio el cliente. Si no coincide responde 409 price_changed; nunca se usa para cobrar }
+      responses:
+        "201":
+          description: Pedido creado (200 si la clave de idempotencia ya creó uno)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      number: { type: integer }
+                      token: { type: string, description: "Token privado de seguimiento para /orders/{token}" }
+                      grand_total: { type: integer }
+                      status: { type: string }
+                      payment_status: { type: string }
+        "400": { description: "idempotency_key_required" }
+        "404": { description: "cart_not_found" }
+        "409": { description: "price_changed o cart_changed. Incluye `cart` con el resumen actualizado" }
+        "422": { description: "Validación, cart_empty, payment_unavailable, shipping_unavailable o stock_insufficient" }
+  /storefront/v1/orders/{token}:
+    get:
+      summary: Seguimiento con el enlace privado. Sin sesión solo muestra comuna y región, nunca la dirección ni el correo
+      parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: "#/components/schemas/Order" } } } } } }
+        "404": { description: No existe }
+  /storefront/v1/auth/register:
+    post:
+      summary: Crea la cuenta, envía la confirmación de correo y devuelve el token (30 días)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, last_name, email, password, password_confirmation, accepts_terms]
+              properties:
+                first_name: { type: string }
+                last_name: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8, description: Con letras y números }
+                password_confirmation: { type: string }
+                accepts_terms: { type: boolean }
+                marketing_opt_in: { type: boolean }
+      responses:
+        "201": { $ref: "#/components/responses/Session" }
+        "422": { description: Validación o correo ya registrado }
+  /storefront/v1/auth/login:
+    post:
+      summary: Ingreso. 5 intentos por correo e IP por minuto. Une el carrito de invitado (X-Cart-Token) a la cuenta
+      parameters: [{ $ref: "#/components/parameters/CartToken" }]
+      requestBody:
+        content: { application/json: { schema: { type: object, required: [email, password], properties: { email: { type: string }, password: { type: string } } } } }
+      responses:
+        "200": { $ref: "#/components/responses/Session" }
+        "422": { description: Correo o contraseña incorrectos }
+        "429": { description: too_many_attempts }
+  /storefront/v1/auth/logout:
+    post: { summary: Revoca el token, security: [{ customerToken: [] }], responses: { "200": { description: OK } } }
+  /storefront/v1/auth/forgot-password:
+    post:
+      summary: Envía el enlace de recuperación. Responde lo mismo exista o no la cuenta
+      requestBody: { content: { application/json: { schema: { type: object, properties: { email: { type: string } } } } } }
+      responses: { "200": { description: OK } }
+  /storefront/v1/auth/reset-password:
+    post:
+      summary: Cambia la contraseña con el token del correo y cierra las sesiones abiertas
+      requestBody: { content: { application/json: { schema: { type: object, required: [token, email, password, password_confirmation], properties: { token: { type: string }, email: { type: string }, password: { type: string }, password_confirmation: { type: string } } } } } }
+      responses: { "200": { description: OK }, "422": { description: Enlace inválido o vencido } }
+  /storefront/v1/auth/verify-email:
+    post:
+      summary: Confirma el correo (enlace válido 48 horas) y vincula los pedidos de invitado con ese correo
+      requestBody: { content: { application/json: { schema: { type: object, properties: { token: { type: string } } } } } }
+      responses: { "200": { description: OK }, "422": { description: Enlace inválido o vencido } }
+  /storefront/v1/auth/resend-verification:
+    post: { summary: Reenvía la confirmación (máximo 3 cada 10 minutos), security: [{ customerToken: [] }], responses: { "200": { description: OK } } }
+  /storefront/v1/me:
+    get:
+      summary: Perfil del cliente
+      security: [{ customerToken: [] }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: "#/components/schemas/Customer" } } } } } }, "401": { description: No autenticado } }
+    patch:
+      summary: Actualiza nombre, apellido, teléfono, RUT y preferencia de correos
+      security: [{ customerToken: [] }]
+      responses: { "200": { description: OK } }
+  /storefront/v1/me/password:
+    put:
+      summary: Cambia la contraseña (pide la actual)
+      security: [{ customerToken: [] }]
+      responses: { "200": { description: OK }, "422": { description: Contraseña actual incorrecta } }
+  /storefront/v1/me/orders:
+    get:
+      summary: Pedidos del cliente (20 por página)
+      security: [{ customerToken: [] }]
+      responses: { "200": { description: "data: [{ uuid, number, placed_at, status, status_label, payment_status_label, grand_total }], meta" } }
+  /storefront/v1/me/orders/{uuid}:
+    get:
+      summary: Detalle de un pedido propio, con dirección completa
+      security: [{ customerToken: [] }]
+      parameters: [{ name: uuid, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: "#/components/schemas/Order" } } } } } }, "404": { description: No existe o es de otro cliente } }
+  /storefront/v1/me/addresses:
+    get:
+      summary: Direcciones guardadas (la principal primero)
+      security: [{ customerToken: [] }]
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: "#/components/schemas/Address" } } } } } } } }
+    post:
+      summary: Agrega una dirección (máximo 20)
+      security: [{ customerToken: [] }]
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/AddressInput" } } } }
+      responses: { "201": { description: Creada } }
+  /storefront/v1/me/addresses/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+    patch:
+      summary: Edita una dirección propia
+      security: [{ customerToken: [] }]
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/AddressInput" } } } }
+      responses: { "200": { description: OK }, "404": { description: No existe o es de otro cliente } }
+    delete:
+      summary: Elimina una dirección propia
+      security: [{ customerToken: [] }]
+      responses: { "200": { description: OK } }
 components:
+  securitySchemes:
+    customerToken:
+      type: http
+      scheme: bearer
+      description: Token del cliente (Sanctum, 30 días). Lo guarda el servidor de la tienda en una cookie httpOnly
+  parameters:
+    CartToken:
+      name: X-Cart-Token
+      in: header
+      required: false
+      schema: { type: string }
+      description: Token del carrito de invitado. Lo guarda el servidor de la tienda en una cookie httpOnly
+  responses:
+    Cart:
+      description: Carrito con totales recalculados
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { $ref: "#/components/schemas/Cart" }
+              token: { type: [string, "null"], description: Solo al crear el carrito }
+    Session:
+      description: Sesión iniciada
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                properties:
+                  token: { type: string }
+                  customer: { $ref: "#/components/schemas/Customer" }
   schemas:
     Readiness:
       type: object
@@ -331,3 +615,99 @@ components:
         name: { type: string }
         slug: { type: string }
         logo: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
+    Cart:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              sku: { type: string }
+              product_slug: { type: string }
+              name: { type: string }
+              variant_label: { type: [string, "null"] }
+              image: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
+              quantity: { type: integer }
+              unit_price: { type: integer, description: Con IVA }
+              compare_at: { type: [integer, "null"] }
+              previous_unit_price: { type: [integer, "null"], description: Precio al agregarlo, si cambió }
+              line_total: { type: integer }
+              tax_amount: { type: integer }
+              purchasable: { type: boolean }
+              max_quantity: { type: [integer, "null"], description: null = sin límite de stock }
+              stock: { type: [object, "null"] }
+        count: { type: integer }
+        subtotal: { type: integer, description: Solo productos comprables }
+        tax_total: { type: integer }
+        warnings: { type: array, items: { type: string } }
+        currency: { type: string, example: CLP }
+    ShippingOption:
+      type: object
+      properties:
+        code: { type: string }
+        name: { type: string }
+        type: { type: string, enum: [flat, pickup] }
+        description: { type: [string, "null"] }
+        amount: { type: integer, description: Con IVA; 0 si aplica despacho gratis }
+        free_over: { type: [integer, "null"] }
+        estimated_days: { type: [string, "null"] }
+        pickup_address: { type: [string, "null"] }
+    Order:
+      type: object
+      properties:
+        number: { type: integer }
+        uuid: { type: [string, "null"], description: Solo para el dueño con sesión }
+        placed_at: { type: string, format: date-time }
+        status: { type: string, enum: [pending, processing, completed, cancelled] }
+        status_label: { type: string }
+        payment_status: { type: string, enum: [pending, paid, expired, cancelled, refunded] }
+        payment_status_label: { type: string }
+        first_name: { type: string }
+        email: { type: [string, "null"], description: Solo para el dueño con sesión }
+        items: { type: array, items: { type: object } }
+        subtotal: { type: integer }
+        shipping_total: { type: integer }
+        tax_total: { type: integer }
+        grand_total: { type: integer }
+        shipping: { type: object, description: "method, type, estimated_days, address (por token: solo commune y region)" }
+        payment:
+          type: object
+          properties:
+            method: { type: string }
+            status: { type: [string, "null"] }
+            expires_at: { type: [string, "null"], format: date-time }
+            transfer: { type: [object, "null"], description: Datos bancarios mientras el pago está pendiente }
+        document_type: { type: string }
+        events: { type: array, items: { type: object, properties: { type: { type: string }, label: { type: string }, at: { type: string } } } }
+    Customer:
+      type: object
+      properties:
+        first_name: { type: string }
+        last_name: { type: string }
+        email: { type: string }
+        phone: { type: [string, "null"] }
+        rut: { type: [string, "null"] }
+        marketing_opt_in: { type: boolean }
+        email_verified: { type: boolean }
+    AddressInput:
+      type: object
+      required: [recipient, phone, street, number, region_code, commune]
+      properties:
+        label: { type: [string, "null"] }
+        recipient: { type: string }
+        phone: { type: string }
+        street: { type: string }
+        number: { type: string }
+        apartment: { type: [string, "null"] }
+        region_code: { type: string }
+        commune: { type: string }
+        reference: { type: [string, "null"] }
+        is_default: { type: boolean }
+    Address:
+      allOf:
+        - { $ref: "#/components/schemas/AddressInput" }
+        - type: object
+          properties:
+            id: { type: integer }
+            region: { type: string }

@@ -6,11 +6,12 @@ import type { StockStatus, ProductDetail, Variant } from "@/lib/types";
 import { mediaUrl } from "@/lib/format";
 import { Price } from "@/components/ui/Price";
 import { buttonClass } from "@/components/ui/Button";
+import { useCart } from "@/components/cart/CartProvider";
 
 /**
  * Galería + selector de variantes. El precio mostrado corresponde siempre a la
- * variante elegida. El carrito llega en la Fase 5: el botón queda deshabilitado
- * y lo dice, en vez de simular una compra.
+ * variante elegida. "Agregar al carrito" envía solo el SKU y la cantidad: el precio
+ * lo calcula siempre el servidor.
  */
 export function ProductView({ product }: { product: ProductDetail }) {
   const initial = product.variants.find((v) => v.is_default) ?? product.variants[0];
@@ -49,6 +50,18 @@ export function ProductView({ product }: { product: ProductDetail }) {
     const match = product.variants.find((v) => product.options.every((a) => v.options[a.code] === next[a.code]));
     const idx = match?.image ? product.images.findIndex((img) => img.path === match.image?.path) : -1;
     if (idx >= 0) setImageIndex(idx);
+  };
+
+  const { add } = useCart();
+  const [adding, setAdding] = useState(false);
+  const soldOut = variant?.stock?.availability === "out_of_stock";
+  const canBuy = Boolean(variant && variant.price && !soldOut);
+  const buyLabel = !variant ? "Combinación no disponible" : soldOut ? "Agotado" : !variant.price ? "Sin precio" : adding ? "Agregando…" : "Agregar al carrito";
+  const addToCart = async () => {
+    if (!variant || !canBuy) return;
+    setAdding(true);
+    await add(variant.sku, 1);
+    setAdding(false);
   };
 
   const images = product.images.length > 0 ? product.images : [];
@@ -169,17 +182,16 @@ export function ProductView({ product }: { product: ProductDetail }) {
 
         <div className="mt-10">
           <StockNote stock={variant?.stock} />
-          <button type="button" disabled className={buttonClass("primary", "h-14 w-full text-base")}>
-            {variant?.stock?.availability === "out_of_stock" ? "Agotado" : "Agregar al carrito"}
+          <button type="button" disabled={!canBuy || adding} onClick={addToCart} className={buttonClass("primary", "h-14 w-full text-base")}>
+            {buyLabel}
           </button>
-          <p className="mt-3 text-center text-xs text-muted">La compra en línea se habilita próximamente.</p>
         </div>
 
         {/* Barra fija en móvil con precio y acción */}
         <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-4 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur lg:hidden">
           <Price price={variant?.price ?? null} />
-          <button type="button" disabled className={buttonClass("primary", "h-11 px-5")}>
-            {variant?.stock?.availability === "out_of_stock" ? "Agotado" : "Agregar al carrito"}
+          <button type="button" disabled={!canBuy || adding} onClick={addToCart} className={buttonClass("primary", "h-11 px-5")}>
+            {buyLabel}
           </button>
         </div>
 

@@ -104,3 +104,127 @@ export type HomeData = {
   on_sale: ProductCard[];
   brands: BrandCard[];
 };
+
+/* ---------- Carrito, checkout, pedidos y cuenta (Fase 5) ---------- */
+
+export type CartLine = {
+  sku: string;
+  product_slug: string;
+  name: string;
+  variant_label: string | null;
+  image: Image | null;
+  quantity: number;
+  unit_price: number;
+  compare_at: number | null;
+  previous_unit_price: number | null;
+  line_total: number;
+  tax_amount: number;
+  purchasable: boolean;
+  /** null = sin límite de stock (no se controla o admite pedidos sin stock) */
+  max_quantity: number | null;
+  stock: StockStatus | null;
+};
+
+export type Cart = {
+  items: CartLine[];
+  count: number;
+  subtotal: number;
+  tax_total: number;
+  warnings: string[];
+  currency: string;
+};
+
+export type ShippingOption = {
+  code: string;
+  name: string;
+  type: "flat" | "pickup";
+  description: string | null;
+  amount: number;
+  free_over: number | null;
+  estimated_days: string | null;
+  pickup_address: string | null;
+};
+
+export type PaymentOption = { code: string; name: string; description: string };
+
+export type CheckoutOptions = { shipping_methods: ShippingOption[]; payment_methods: PaymentOption[]; subtotal: number };
+
+export type GeoRegion = { code: string; name: string; communes: string[] };
+
+export type TransferInstructions = {
+  bank_name: string | null;
+  account_type: string | null;
+  account_number: string | null;
+  account_holder: string | null;
+  account_rut: string | null;
+  account_email: string | null;
+  instructions: string | null;
+  hours: number;
+};
+
+export type OrderAddress = {
+  recipient?: string;
+  phone?: string;
+  street?: string;
+  number?: string;
+  apartment?: string | null;
+  commune: string | null;
+  region: string | null;
+  reference?: string | null;
+};
+
+export type OrderDetail = {
+  number: number;
+  uuid: string | null;
+  placed_at: string | null;
+  status: string;
+  status_label: string;
+  payment_status: string;
+  payment_status_label: string;
+  first_name: string;
+  email: string | null;
+  items: { name: string; variant_label: string | null; sku: string; image: { path: string; alt: string } | null; quantity: number; unit_price: number; line_total: number }[];
+  subtotal: number;
+  shipping_total: number;
+  tax_total: number;
+  grand_total: number;
+  shipping: { method: string | null; type: string | null; estimated_days: string | null; address: OrderAddress | null };
+  payment: { method: string; status: string | null; expires_at: string | null; transfer: TransferInstructions | null };
+  document_type: string | null;
+  events: { type: string; label: string; at: string | null }[];
+};
+
+export type OrderSummary = {
+  uuid: string;
+  number: number;
+  placed_at: string | null;
+  status: string;
+  status_label: string;
+  payment_status_label: string;
+  grand_total: number;
+};
+
+export type CustomerProfile = {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  rut: string | null;
+  marketing_opt_in: boolean;
+  email_verified: boolean;
+};
+
+export type CustomerAddress = {
+  id: number;
+  label: string | null;
+  recipient: string;
+  phone: string;
+  street: string;
+  number: string;
+  apartment: string | null;
+  region_code: string | null;
+  region: string | null;
+  commune: string;
+  reference: string | null;
+  is_default: boolean;
+};
