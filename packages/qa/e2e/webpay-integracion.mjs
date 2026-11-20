@@ -291,20 +291,17 @@ await caso("anulado por el cliente en Webpay", async () => {
   const pedido = await nuevoPedido(sku);
   const c = "2-anulado";
   await irAWebpay(page, c, pedido.token, /Pagar con Webpay/);
-  await click(page, ["button.btn-return", ...hasText("Anular"), 'a[href*="anular" i]'], "el enlace Anular compra");
-  await page.waitForTimeout(1500);
-  if (!page.url().startsWith(STORE)) {
-    await evidencia(page, c, "confirmar-anulacion");
-    // Webpay pide confirmar en una ventana propia
-    const modal = page.locator("app-modal-error, [class*=modal__content]").first();
-    if (await modal.isVisible().catch(() => false)) {
-      console.log(`    ventana de Webpay: ${(await modal.innerText()).replace(/\s+/g, " ").slice(0, 300)}`);
-      const botones = modal.locator("button, a");
-      const textos = await botones.allInnerTexts();
-      console.log(`    botones: ${JSON.stringify(textos)}`);
-      const i = textos.findIndex((t) => /anular|s[ií]|aceptar|confirmar|volver/i.test(t));
-      if (i >= 0) await botones.nth(i).click();
+  // A veces el ambiente de integración responde con error al anular y ofrece "Intentar nuevamente"
+  for (let intento = 1; intento <= 4 && !page.url().startsWith(STORE); intento++) {
+    const reintentar = page.getByRole("button", { name: /Intentar nuevamente/i });
+    if (await reintentar.isVisible().catch(() => false)) {
+      console.log(`    Webpay mostró un error al anular (intento ${intento}), se reintenta`);
+      await reintentar.click().catch(() => {});
+      await page.waitForTimeout(3000);
     }
+    await click(page, ["button.btn-return", ...hasText("Anular")], "el botón Anular compra y volver", 30000);
+    await page.waitForURL((u) => u.toString().startsWith(STORE), { timeout: 20000 }).catch(() => {});
+    if (!page.url().startsWith(STORE)) await evidencia(page, c, `anulacion-intento-${intento}`);
   }
   const vuelta = await volverALaTienda(page, c);
   assert(vuelta.searchParams.get("pago") === "anulado", `se esperaba pago=anulado y llegó ${vuelta.search}`);
