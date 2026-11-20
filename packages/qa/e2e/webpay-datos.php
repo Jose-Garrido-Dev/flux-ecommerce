@@ -63,6 +63,10 @@ switch ($mode) {
 }
 } catch (Throwable $e) {
     fwrite(STDERR, get_class($e).': '.$e->getMessage()."\n");
+    if ($mode === 'reembolso' && isset($order)) {
+        $last = $order->payments()->with('transactions')->get()->flatMap->transactions->sortByDesc('id')->first();
+        fwrite(STDERR, 'Última respuesta de la pasarela: '.json_encode($last?->only(['type', 'http_status', 'request', 'response']), JSON_UNESCAPED_UNICODE)."\n");
+    }
     exit(1);
 }
 echo "\n";
