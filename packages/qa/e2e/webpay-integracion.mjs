@@ -270,7 +270,16 @@ await caso("anulado por el cliente en Webpay", async () => {
   await page.waitForTimeout(1500);
   if (!page.url().startsWith(STORE)) {
     await evidencia(page, c, "confirmar-anulacion");
-    await find(page, [...hasText("Anular"), ...hasText("Sí"), ...hasText("Si,")], 5000).then((l) => l?.click());
+    // Webpay pide confirmar en una ventana propia
+    const modal = page.locator("app-modal-error, [class*=modal__content]").first();
+    if (await modal.isVisible().catch(() => false)) {
+      console.log(`    ventana de Webpay: ${(await modal.innerText()).replace(/\s+/g, " ").slice(0, 300)}`);
+      const botones = modal.locator("button, a");
+      const textos = await botones.allInnerTexts();
+      console.log(`    botones: ${JSON.stringify(textos)}`);
+      const i = textos.findIndex((t) => /anular|s[ií]|aceptar|confirmar|volver/i.test(t));
+      if (i >= 0) await botones.nth(i).click();
+    }
   }
   const vuelta = await volverALaTienda(page, c);
   assert(vuelta.searchParams.get("pago") === "anulado", `se esperaba pago=anulado y llegó ${vuelta.search}`);
