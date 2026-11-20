@@ -30,6 +30,11 @@ if (app()->isProduction()) {
 try {
 switch ($mode) {
     case 'preparar':
+        // El código de comercio de integración es público y compartido: cada ejecución parte en un número
+        // de pedido distinto para que las órdenes de compra no choquen con las de ejecuciones anteriores.
+        if (Illuminate\Support\Facades\DB::getDriverName() === 'pgsql' && ! Order::query()->exists()) {
+            Illuminate\Support\Facades\DB::select("select setval('orders_id_seq', ?)", [(time() % 100000000) * 10]);
+        }
         ShippingMethod::query()->updateOrCreate(['code' => 'retiro'], ['name' => 'Retiro en tienda', 'type' => 'pickup', 'amount' => 0, 'status' => 'active']);
         $variantId = InventoryLevel::query()->selectRaw('variant_id, sum(on_hand - reserved) as libre')
             ->groupBy('variant_id')->havingRaw('sum(on_hand - reserved) >= 5')->orderBy('variant_id')->value('variant_id');
