@@ -10,6 +10,7 @@ use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductVariant;
 use App\Domain\Catalog\Services\MediaUploader;
+use App\Domain\Orders\Models\Order;
 use App\Filament\Pages\ImportProducts;
 use App\Filament\Resources\Brands\Pages\ManageBrands;
 use App\Filament\Resources\Categories\Pages\EditCategory;
@@ -22,11 +23,9 @@ use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -162,12 +161,17 @@ class CatalogAdminTest extends TestCase
 
     public function test_product_with_orders_cannot_be_deleted(): void
     {
-        Schema::create('order_items', function (Blueprint $t) {
-            $t->id();
-            $t->foreignId('variant_id');
-        });
         $product = $this->product('Vendido', [['price' => 1000]]);
-        \DB::table('order_items')->insert(['variant_id' => $product->variants()->value('id')]);
+        $variant = $product->variants()->first();
+        $order = Order::query()->create([
+            'email' => 'ana@correo.cl', 'first_name' => 'Ana', 'last_name' => 'Pérez',
+            'subtotal' => 1000, 'tax_total' => 160, 'shipping_total' => 0, 'grand_total' => 1000,
+            'tracking_token_hash' => hash('sha256', 'prueba'),
+        ]);
+        $order->items()->create([
+            'variant_id' => $variant->id, 'product_name' => 'Vendido', 'sku' => $variant->sku, 'quantity' => 1,
+            'unit_price' => 1000, 'tax_rate_bp' => 1900, 'tax_amount' => 160, 'line_total' => 1000,
+        ]);
 
         Livewire::test(EditProduct::class, ['record' => $product->getRouteKey()])
             ->callAction(DeleteAction::class);

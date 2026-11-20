@@ -2,23 +2,33 @@
 
 namespace Tests\Feature\Language;
 
+use App\Domain\Cart\Services\CartService;
 use App\Domain\Catalog\Models\Brand;
 use App\Domain\Catalog\Models\Category;
+use App\Domain\Customers\Models\Customer;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Models\InventoryLevel;
 use App\Domain\Inventory\Models\Warehouse;
 use App\Domain\Inventory\Services\InventoryService;
+use App\Domain\Orders\Services\PlaceOrder;
+use App\Domain\Shipping\Models\ShippingMethod;
+use App\Domain\System\Services\SettingsRepository;
 use App\Filament\Pages\InventorySettings;
+use App\Filament\Pages\PaymentSettingsPage;
 use App\Filament\Resources\Attributes\Pages\ListAttributes;
 use App\Filament\Resources\Brands\Pages\ManageBrands;
 use App\Filament\Resources\Categories\Pages\ListCategories;
+use App\Filament\Resources\Customers\Pages\ViewCustomer;
 use App\Filament\Resources\InventoryLevels\Pages\ListInventoryLevels;
+use App\Filament\Resources\Orders\Pages\ListOrders;
+use App\Filament\Resources\Orders\Pages\ViewOrder;
 use App\Filament\Resources\Products\Pages\CreateProduct;
 use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Resources\Products\RelationManagers\MediaRelationManager;
 use App\Filament\Resources\Products\RelationManagers\RelatedProductsRelationManager;
 use App\Filament\Resources\Products\RelationManagers\VariantsRelationManager;
+use App\Filament\Resources\ShippingMethods\Pages\ManageShippingMethods;
 use App\Filament\Resources\StockMovements\Pages\ListStockMovements;
 use App\Filament\Resources\StockReservations\Pages\ListStockReservations;
 use App\Filament\Resources\StockTransfers\Pages\CreateStockTransfer;
@@ -117,29 +127,29 @@ class SpanishOnlyModalsTest extends TestCase
         $this->check('Producto: registrar movimiento', Livewire::test(EditProduct::class, ['record' => $product->getRouteKey()])->mountAction('stockMovement'));
 
         // Ventas, clientes, envíos y pagos
-        app(\App\Domain\System\Services\SettingsRepository::class)->putMany('payments', [
+        app(SettingsRepository::class)->putMany('payments', [
             'bank_transfer_enabled' => true, 'bank_name' => 'Banco', 'account_type' => 'Cuenta corriente', 'account_number' => '1',
             'account_holder' => 'Tienda', 'account_rut' => '76.123.456-0',
         ]);
-        \App\Domain\Shipping\Models\ShippingMethod::query()->create(['code' => 'domicilio', 'name' => 'Despacho', 'type' => 'flat', 'amount' => 3990]);
+        ShippingMethod::query()->create(['code' => 'domicilio', 'name' => 'Despacho', 'type' => 'flat', 'amount' => 3990]);
         $inventory->move($variant, Warehouse::default(), MovementType::PurchaseIn, 5, 'Compra');
-        [$cart] = app(\App\Domain\Cart\Services\CartService::class)->create();
-        app(\App\Domain\Cart\Services\CartService::class)->setQuantity($cart, $variant->sku, 1);
-        $order = app(\App\Domain\Orders\Services\PlaceOrder::class)->handle($cart, [
+        [$cart] = app(CartService::class)->create();
+        app(CartService::class)->setQuantity($cart, $variant->sku, 1);
+        $order = app(PlaceOrder::class)->handle($cart, [
             'email' => 'ana@correo.cl', 'first_name' => 'Ana', 'last_name' => 'Pérez', 'phone' => '912345678',
             'shipping_method' => 'domicilio', 'payment_method' => 'bank_transfer',
             'address' => ['recipient' => 'Ana', 'phone' => '912345678', 'street' => 'Los Leones', 'number' => '1', 'region_code' => 'CL-RM', 'commune' => 'Providencia'],
         ], null, 'clave');
-        $customer = \App\Domain\Customers\Models\Customer::query()->create(['first_name' => 'Ana', 'last_name' => 'Pérez', 'email' => 'ana@correo.cl', 'password' => 'clave1234']);
-        $viewOrder = fn () => Livewire::test(\App\Filament\Resources\Orders\Pages\ViewOrder::class, ['record' => $order->getRouteKey()]);
+        $customer = Customer::query()->create(['first_name' => 'Ana', 'last_name' => 'Pérez', 'email' => 'ana@correo.cl', 'password' => 'clave1234']);
+        $viewOrder = fn () => Livewire::test(ViewOrder::class, ['record' => $order->getRouteKey()]);
         $this->check('Pedido: confirmar pago', $viewOrder()->mountAction('confirmPayment'));
         $this->check('Pedido: confirmar pago con monto distinto', $viewOrder()->callAction('confirmPayment', data: ['amount' => 1]));
         $this->check('Pedido: cancelar (vacío)', $viewOrder()->callAction('cancel', data: []));
-        $this->check('Pedidos: filtros', Livewire::test(\App\Filament\Resources\Orders\Pages\ListOrders::class)->filterTable('status', 'pending'));
-        $this->check('Cliente: bloquear', Livewire::test(\App\Filament\Resources\Customers\Pages\ViewCustomer::class, ['record' => $customer->getRouteKey()])->mountAction('block'));
-        $this->check('Envíos: nuevo', Livewire::test(\App\Filament\Resources\ShippingMethods\Pages\ManageShippingMethods::class)->mountAction('create'));
-        $this->check('Envíos: nuevo (vacío)', Livewire::test(\App\Filament\Resources\ShippingMethods\Pages\ManageShippingMethods::class)->callAction('create', data: ['type' => null]));
-        $this->check('Pagos (vacío)', Livewire::test(\App\Filament\Pages\PaymentSettingsPage::class)->fillForm(['bank_transfer_enabled' => true, 'bank_transfer_hours' => null])->call('save'));
+        $this->check('Pedidos: filtros', Livewire::test(ListOrders::class)->filterTable('status', 'pending'));
+        $this->check('Cliente: bloquear', Livewire::test(ViewCustomer::class, ['record' => $customer->getRouteKey()])->mountAction('block'));
+        $this->check('Envíos: nuevo', Livewire::test(ManageShippingMethods::class)->mountAction('create'));
+        $this->check('Envíos: nuevo (vacío)', Livewire::test(ManageShippingMethods::class)->callAction('create', data: ['type' => null]));
+        $this->check('Pagos (vacío)', Livewire::test(PaymentSettingsPage::class)->fillForm(['bank_transfer_enabled' => true, 'bank_transfer_hours' => null])->call('save'));
 
         $this->assertSame([], array_values(array_unique($this->problems)),
             "Texto en inglés en modales o validaciones:\n".implode("\n", array_unique($this->problems)));

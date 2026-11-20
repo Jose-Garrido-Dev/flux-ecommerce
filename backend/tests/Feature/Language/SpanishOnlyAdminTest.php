@@ -2,13 +2,19 @@
 
 namespace Tests\Feature\Language;
 
+use App\Domain\Cart\Services\CartService;
 use App\Domain\Catalog\Models\Attribute;
 use App\Domain\Catalog\Models\Brand;
 use App\Domain\Catalog\Models\Category;
+use App\Domain\Customers\Models\Customer;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Models\Warehouse;
 use App\Domain\Inventory\Services\InventoryService;
+use App\Domain\Orders\Services\OrderPayments;
+use App\Domain\Orders\Services\PlaceOrder;
 use App\Domain\Shipping\Models\Region;
+use App\Domain\Shipping\Models\ShippingMethod;
+use App\Domain\System\Services\SettingsRepository;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -46,22 +52,22 @@ class SpanishOnlyAdminTest extends TestCase
         $transfer = $inventory->transfer($main, $store, [['variant_id' => $variant->id, 'quantity' => 2]], 'Reposición');
         $inventory->reserve($variant, 1, 'cart', 'carrito-prueba');
         // Ventas: un pedido de invitado, un cliente registrado y un método de envío
-        app(\App\Domain\System\Services\SettingsRepository::class)->putMany('payments', [
+        app(SettingsRepository::class)->putMany('payments', [
             'bank_transfer_enabled' => true, 'bank_name' => 'Banco', 'account_type' => 'Cuenta corriente', 'account_number' => '1',
             'account_holder' => 'Tienda', 'account_rut' => '76.123.456-0',
         ]);
-        \App\Domain\Shipping\Models\ShippingMethod::query()->create(['code' => 'domicilio', 'name' => 'Despacho', 'type' => 'flat', 'amount' => 3990]);
-        $customer = \App\Domain\Customers\Models\Customer::query()->create(['first_name' => 'Ana', 'last_name' => 'Pérez', 'email' => 'ana@correo.cl', 'password' => 'clave1234']);
+        ShippingMethod::query()->create(['code' => 'domicilio', 'name' => 'Despacho', 'type' => 'flat', 'amount' => 3990]);
+        $customer = Customer::query()->create(['first_name' => 'Ana', 'last_name' => 'Pérez', 'email' => 'ana@correo.cl', 'password' => 'clave1234']);
         $customer->addresses()->create(['recipient' => 'Ana', 'phone' => '912345678', 'street' => 'Los Leones', 'number' => '1', 'region_id' => Region::query()->first()->id, 'commune' => 'Providencia', 'is_default' => true]);
-        [$cart] = app(\App\Domain\Cart\Services\CartService::class)->create($customer);
-        app(\App\Domain\Cart\Services\CartService::class)->setQuantity($cart, $variant->sku, 1);
-        $order = app(\App\Domain\Orders\Services\PlaceOrder::class)->handle($cart, [
+        [$cart] = app(CartService::class)->create($customer);
+        app(CartService::class)->setQuantity($cart, $variant->sku, 1);
+        $order = app(PlaceOrder::class)->handle($cart, [
             'email' => 'ana@correo.cl', 'first_name' => 'Ana', 'last_name' => 'Pérez', 'phone' => '912345678',
             'shipping_method' => 'domicilio', 'payment_method' => 'bank_transfer', 'document_type' => 'factura',
             'billing_rut' => '76.123.456-0', 'billing_name' => 'Empresa SpA', 'billing_activity' => 'Comercio',
             'address' => ['recipient' => 'Ana', 'phone' => '912345678', 'street' => 'Los Leones', 'number' => '1', 'region_code' => 'CL-RM', 'commune' => 'Providencia'],
         ], $customer, 'clave');
-        app(\App\Domain\Orders\Services\OrderPayments::class)->confirm($order, $order->grand_total, 'OP-1');
+        app(OrderPayments::class)->confirm($order, $order->grand_total, 'OP-1');
         $records = [
             'orders' => $order, 'customers' => $customer,
             'stock-transfers' => $transfer,

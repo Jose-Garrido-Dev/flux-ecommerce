@@ -230,6 +230,13 @@ Las credenciales de pasarelas de pago, couriers e IA **no van en el `.env`**: se
 
 Solo las variables que empiezan con `NEXT_PUBLIC_` llegan al navegador. **Nunca** pongas claves con ese prefijo.
 
+**Carrito y sesión de clientes.** El navegador nunca habla directo con Laravel ni ve tokens:
+
+- El navegador llama a `/api/tienda/...` en el propio dominio de la tienda. Ese puente (en Next.js) solo deja pasar las rutas del carrito, el checkout y Mi cuenta, y rechaza escrituras que no vengan de la misma tienda (cabecera `Origin`).
+- El token del carrito y el de la sesión del cliente se guardan en cookies `httpOnly` (`flux_carrito`, 60 días; `flux_sesion`, 30 días). El servidor de la tienda los reenvía a Laravel junto con la IP real del comprador.
+- Las cookies se marcan `Secure` cuando `NEXT_PUBLIC_SITE_URL` empieza con `https://`. Por eso en producción esa variable debe tener la URL real con `https`.
+- El proxy de entrada (Apache de Webuzo, Caddy o Nginx) debe enviar `X-Forwarded-For` y mantener la cabecera `Host` original. Las configuraciones de la sección 6 ya lo hacen.
+
 ### 5.3 `.env` de la raíz (solo producción)
 
 Lo usa `compose.prod.yml`. Ver comentarios en [`.env.example`](../.env.example).
@@ -414,6 +421,10 @@ El panel mostrará una alerta si el scheduler deja de reportar actividad.
 
 **Reservas de stock.** El scheduler ejecuta cada minuto `inventory:expire-reservations`, que libera las reservas de carritos y pagos que vencieron. Si el scheduler no corre, ese stock queda apartado y no se puede vender: la tarjeta *Reservas vencidas sin liberar* del panel lo avisa. En desarrollo sin Docker, ábrelo en otra terminal con `php artisan schedule:work`, o libera a mano con `php artisan inventory:expire-reservations`.
 
+**Pedidos por transferencia sin pagar.** Cada minuto el scheduler ejecuta `orders:expire-unpaid`: anula los pedidos cuyo plazo de pago venció (48 horas por defecto, se cambia en *Configuración → Pagos*) y devuelve su stock a la venta. Sin scheduler, esos productos siguen apartados.
+
+**Correos de la tienda.** La confirmación del pedido, el aviso de pago recibido, el aviso de pedido nuevo para la tienda, la confirmación de correo y la recuperación de contraseña se envían por la cola. Si no llegan, revisa que el worker esté corriendo.
+
 **Importaciones de productos.** Las importaciones de CSV o Excel corren en el worker de colas. Si una importación se queda en "En cola" más de un minuto, el worker no está corriendo. En desarrollo sin Docker, ábrelo en otra terminal con `php artisan queue:work`.
 
 Una importación grande puede tardar hasta 15 minutos. Por eso `DB_QUEUE_RETRY_AFTER` (en `backend/.env`) debe ser mayor que eso: el valor por defecto es `960` segundos. Si lo bajas, el worker podría repetir una importación que todavía está en curso.
@@ -452,7 +463,7 @@ Ninguna integración se considera operativa hasta que se prueba con credenciales
 | Mercado Pago | Pagos | Access token y public key de una cuenta de vendedor; usuarios de prueba | Panel → Configuración → Pagos | Pendiente (Fase 6) |
 | Flow | Pagos | API Key y Secret Key (sandbox en sandbox.flow.cl) | Panel → Configuración → Pagos | Pendiente (Fase 6) |
 | Khipu | Transferencia simplificada | ID de cobrador y llave secreta | Panel → Configuración → Pagos | Pendiente (Fase 6) |
-| Transferencia bancaria | Pago manual | Datos de la cuenta bancaria de la empresa | Panel → Configuración → Pagos | Pendiente (Fase 5) |
+| Transferencia bancaria | Pago manual | Datos de la cuenta bancaria de la empresa | Panel → Configuración → Pagos | Disponible (Fase 5). No usa servicios externos: el pago se confirma a mano en el panel |
 | Chilexpress / Starken / Blue Express | Cotizar, generar etiquetas y tracking | Contrato comercial y credenciales de API con cada courier | Panel → Configuración → Envíos | Pendiente (Fase 7) |
 | Correo transaccional | Confirmaciones, recuperación de contraseña | Cuenta SMTP o API (Resend, Postmark, Amazon SES, Brevo) y registros SPF, DKIM y DMARC en el DNS | `backend/.env` (Fase 1) y panel (Fase 8) | Configurable vía `.env` |
 | Proveedor de IA | Asistente y generación de contenido | API Key (por defecto Anthropic Claude) y presupuesto mensual | Panel → Configuración → IA | Pendiente (Fase 12) |
@@ -518,6 +529,21 @@ Orden recomendado la primera vez:
 6. **Configuración → Inventario**: duración de la reserva (30 minutos por defecto) y si los productos nuevos controlan stock.
 7. Carga el stock: en el formulario de producto (*Stock inicial*), con la columna `stock` de la importación, o en **Inventario → Existencias → Registrar movimiento**. Cada cambio queda en *Inventario → Movimientos*.
 
+8. **Configuración → Pagos**: activa *Transferencia bancaria* y completa banco, tipo y número de cuenta, titular, RUT y correo para comprobantes. Sin esto el checkout muestra que no hay medios de pago activos.
+9. **Logística → Métodos de envío**: crea al menos uno. *Tarifa fija* cobra un monto (opcionalmente gratis desde cierto subtotal) en todas las regiones o solo en las que elijas. *Retiro en tienda* viene creado e inactivo: actívalo si corresponde y completa la dirección en *Datos del negocio*.
+10. **Comunas**: la tienda trae las 16 regiones. Las comunas se cargan desde el listado oficial de códigos territoriales (CUT) de la SUBDERE, para no inventar datos. Mientras no se carguen, el cliente escribe la comuna a mano.
+
+    ```bash
+    # Descarga el CSV oficial de comunas (CUT) y deja dos columnas: codigo,nombre
+    # Ejemplo de filas:  13101,Santiago   05101,Valparaíso
+    docker compose exec app php artisan geo:import-communes /ruta/comunas.csv --dry-run   # revisa sin guardar
+    docker compose exec app php artisan geo:import-communes /ruta/comunas.csv
+    ```
+
+    Los dos primeros dígitos del código indican la región. Cuando las comunas están cargadas, el checkout muestra una lista y rechaza comunas que no pertenezcan a la región elegida.
+
+**Cómo se vende (Fase 5).** El cliente compra como invitado o con cuenta. Al confirmar el pedido se reserva el stock por el plazo de pago y se le muestran los datos de la transferencia (también le llegan por correo, con un enlace privado de seguimiento). Cuando el dinero llegue a tu cuenta, entra a **Ventas → Pedidos**, abre el pedido y usa **Confirmar pago** con el monto y el número de la transferencia: el stock se descuenta y el cliente recibe el aviso. Si no paga a tiempo, el pedido se anula solo.
+
 Al actualizar desde la Fase 3: los productos que ya existían quedan con **Controlar stock apagado** (se siguen vendiendo sin límite, como antes). Actívalo por producto en la pestaña *Inventario*, o importa un archivo con las columnas `sku` y `stock` (al informar stock se activa solo).
 
 Las imágenes se guardan en el disco del servidor, en `backend/storage/app/public/catalog`. Cada imagen se reduce a 2400 px como máximo y se le genera una miniatura. Inclúyelas en los respaldos (sección 7.2). Cada pantalla del panel tiene su botón **Manual de uso**.
@@ -569,4 +595,8 @@ La lista de palabras está en `packages/qa/palabras-ingles.json`. Si una palabra
 | Con Webuzo, error 502/503 en el dominio | Los contenedores de Flux no están corriendo | `docker compose -f compose.prod.yml --env-file .env ps` |
 | La tienda muestra "Agotado" aunque hay stock | Stock reservado por carritos que no se liberan porque el scheduler no corre, o la bodega está inactiva | Revisar *Inventario → Reservas* y la sección 7.1; revisar el estado de la bodega |
 | No se puede cargar stock en un producto | El rol del usuario no tiene permiso de inventario | Asignar el rol *Inventario* o *Administrador de tienda* en Usuarios |
+| El checkout dice que no hay medios de pago activos | La transferencia no está activada o le faltan datos | *Configuración → Pagos* |
+| El checkout no muestra métodos de despacho para una región | No hay métodos activos que cubran esa región | *Logística → Métodos de envío* |
+| El carrito se vacía al recargar o la sesión del cliente no se mantiene | Cookies `Secure` en un sitio sin https, o `NEXT_PUBLIC_SITE_URL` distinta del dominio real | Revisar `NEXT_PUBLIC_SITE_URL` (sección 5.2) |
+| Al agregar al carrito aparece "Solicitud no permitida" | El proxy cambia la cabecera `Host` y no coincide con el origen | Mantener el `Host` original en el proxy (`ProxyPreserveHost On` en Apache) |
 | Con Webuzo, error al subir imágenes grandes | Límite de tamaño del proxy | Aumentar `client_max_body_size` (Nginx) o `LimitRequestBody` (Apache) |

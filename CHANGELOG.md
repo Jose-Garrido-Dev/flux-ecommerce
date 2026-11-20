@@ -6,6 +6,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ### Corregido
 
+- El resumen de errores que Laravel agrega a las respuestas de la API salía en inglés ("(and 10 more errors)"). Ahora dice "(y 10 errores más)".
 - Textos en inglés que se veían en el panel:
   - La etiqueta "Attribute values" en la pestaña Especificaciones.
   - Los nombres de modelos, acciones y resultados en Auditoría.
@@ -15,6 +16,18 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 - Revisiones automáticas para que no vuelva a aparecer texto en inglés en el panel, la tienda ni los correos (sección 10.1 de la guía).
 
 ### Agregado
+
+- Fase 5 (carrito, cuentas y checkout con transferencia):
+  - Carrito de invitado y de cliente. Al ingresar, el carrito de invitado se une al de la cuenta. El navegador solo envía SKU y cantidad: los precios los calcula siempre el servidor, y el carrito avisa si un precio cambió o si un producto ya no está disponible.
+  - Checkout en una página: contacto, dirección, despacho, pago, boleta o factura y comentarios. El total que ve el cliente solo sirve para avisarle si algo cambió; el pedido se cobra con el total recalculado. Una clave de idempotencia evita pedidos duplicados al reintentar.
+  - Pago por transferencia bancaria: el stock se reserva por el plazo configurado (48 horas por defecto) y el pedido sin pagar se anula solo. La confirmación del pago en el panel descuenta el stock y avisa al cliente.
+  - Página del pedido con los datos de la transferencia y enlace privado de seguimiento (sin sesión no muestra la dirección completa).
+  - Mi cuenta: registro, ingreso, confirmación de correo, recuperación de contraseña, datos personales, libreta de direcciones y pedidos.
+  - Panel: *Ventas → Pedidos* (confirmar pago, anular), *Clientes* (bloquear y desbloquear), *Logística → Métodos de envío* y *Configuración → Pagos*, con sus manuales.
+  - Correos: pedido recibido, pago confirmado, pedido nuevo para la tienda, confirmación de correo y recuperación de contraseña. Los correos muestran el nombre de la tienda en vez de "Laravel".
+  - Comando `geo:import-communes` para cargar las comunas desde el listado oficial CUT.
+  - Seguridad: los tokens del carrito y de la sesión viven en cookies httpOnly del dominio de la tienda; el navegador no los ve.
+  - API 0.6.0: carrito, checkout, seguimiento, cuentas, Mi cuenta y regiones.
 
 - Fase 4 (inventario y bodegas):
   - Bodegas con dirección, región, comuna, responsable, prioridad y bodega principal. Viene creada la *Bodega principal*.

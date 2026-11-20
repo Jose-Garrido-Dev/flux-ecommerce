@@ -153,6 +153,15 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/producto/no-existe)" = 404
           curl -s http://127.0.0.1:3000/producto/no-existe -o pagina-404.html
           curl -fsS http://127.0.0.1:3000/ -o pagina-inicio.html
+          # Fase 5: carrito, checkout y Mi cuenta (sin sesión ni carrito)
+          for u in carrito checkout cuenta cuenta/recuperar; do
+            curl -fsS "http://127.0.0.1:3000/$u" -o "pagina-$(echo $u | tr / -).html"
+          done
+          grep -q "Crear cuenta" pagina-cuenta.html
+          # El puente de la tienda solo deja pasar sus rutas y exige el mismo origen para escribir
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/tienda/catalog/products)" = 404
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:3000/api/tienda/cart/items)" = 403
+          curl -fsS http://127.0.0.1:3000/api/tienda/cart | grep -q '"count":0'
           # Regla del proyecto: todo el texto visible en español
           node packages/qa/check-spanish.mjs pagina-*.html
       - name: Registros si algo falló

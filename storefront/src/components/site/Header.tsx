@@ -4,6 +4,7 @@ import type { CategoryNode } from "@/lib/types";
 import { mediaUrl } from "@/lib/format";
 import { Container } from "@/components/ui/Container";
 import { SearchForm } from "./SearchForm";
+import { CartButton } from "@/components/cart/CartButton";
 
 const iconBtn = "flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-subtle";
 
@@ -146,6 +147,14 @@ export function Header({ storeName, menu }: { storeName: string; menu: CategoryN
             <path d="m20 20-3.5-3.5" />
           </svg>
         </Link>
+        <Link href="/cuenta" className={`${iconBtn} -ml-2 xl:ml-0`}>
+          <span className="sr-only">Mi cuenta</span>
+          <svg aria-hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" />
+          </svg>
+        </Link>
+        <CartButton className={`${iconBtn} -ml-2`} />
       </Container>
     </header>
   );
