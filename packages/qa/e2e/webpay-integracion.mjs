@@ -227,7 +227,7 @@ await caso("rechazado y luego aprobado en el mismo pedido", async () => {
   await pagarConTarjeta(page, c, MASTERCARD_RECHAZO, "Rechaz");
   let vuelta = await volverALaTienda(page, c);
   assert(vuelta.searchParams.get("pago") === "rechazado", `se esperaba pago=rechazado y llegó ${vuelta.search}`);
-  await page.getByText("El banco rechazó el pago").waitFor();
+  await page.getByRole("alert").filter({ hasText: "El banco rechazó el pago" }).waitFor();
   let e = estado(pedido.number);
   assert(e.pedido.payment_status === "pending" && e.pagos.at(-1).status === "failed", "el intento rechazado debe quedar como Rechazado y el pedido pendiente");
 
@@ -235,7 +235,7 @@ await caso("rechazado y luego aprobado en el mismo pedido", async () => {
   await pagarConTarjeta(page, c, VISA_OK, "Acept");
   vuelta = await volverALaTienda(page, c);
   assert(vuelta.searchParams.get("pago") === "aprobado", `se esperaba pago=aprobado y llegó ${vuelta.search}`);
-  await page.getByText(/¡Gracias/).waitFor();
+  await page.getByRole("heading", { name: /¡Gracias/ }).waitFor();
   e = estado(pedido.number);
   const pago = e.pagos.at(-1);
   assert(e.pedido.payment_status === "paid" && e.pedido.status === "processing", "el pedido debe quedar pagado y en preparación");
