@@ -1,0 +1,9 @@
+{
+  "name": "flux-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Pruebas de punta a punta contra servicios reales (ambientes de prueba de las pasarelas)",
+  "dependencies": {
+    "playwright": "1.49.1"
+  }
+}

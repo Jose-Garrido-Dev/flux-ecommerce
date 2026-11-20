@@ -5,6 +5,9 @@ namespace App\Filament\Resources\Orders;
 use App\Domain\Orders\Models\Order;
 use App\Domain\Orders\Models\OrderEvent;
 use App\Domain\Orders\Models\OrderItem;
+use App\Domain\Orders\Models\Payment;
+use App\Domain\Payments\Gateways\WebpayPlus\WebpayPlusGateway;
+use App\Domain\Payments\Models\Refund;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
 use BackedEnum;
@@ -93,6 +96,29 @@ class OrderResource extends Resource
                         ->state(fn (Order $record) => self::address($record)),
                     TextEntry::make('notes')->label('Comentarios del cliente')->placeholder('—')->columnSpanFull(),
                 ]),
+                Section::make('Pagos')->schema([
+                    RepeatableEntry::make('payments')->label('Pagos')->hiddenLabel()->columns(4)->schema([
+                        TextEntry::make('method_code')->label('Medio')
+                            ->formatStateUsing(fn ($state, Payment $record) => $record->methodLabel().($record->attempt > 1 ? " (intento {$record->attempt})" : '')),
+                        TextEntry::make('status')->label('Estado')->badge()
+                            ->formatStateUsing(fn ($state) => Payment::STATUSES[$state] ?? $state)
+                            ->color(fn ($state) => match ($state) {
+                                'paid' => 'success', 'pending' => 'warning', 'failed' => 'danger', default => 'gray'
+                            }),
+                        TextEntry::make('amount')->label('Monto')->formatStateUsing(fn ($state) => self::money($state))
+                            ->belowContent(fn (Payment $record) => $record->refunded_amount ? 'Reembolsado: '.self::money($record->refunded_amount) : null),
+                        TextEntry::make('detail')->label('Detalle')->placeholder('—')->state(fn (Payment $record) => self::paymentDetail($record)),
+                    ]),
+                ]),
+                Section::make('Reembolsos')->visible(fn (Order $record) => $record->refunded_total > 0)->schema([
+                    RepeatableEntry::make('refunds')->label('Reembolsos')->hiddenLabel()->columns(4)->schema([
+                        TextEntry::make('created_at')->label('Fecha')->dateTime('d-m-Y H:i'),
+                        TextEntry::make('amount')->label('Monto')->formatStateUsing(fn ($state) => self::money($state)),
+                        TextEntry::make('reason')->label('Motivo'),
+                        TextEntry::make('creator.name')->label('Hecho por')->placeholder('—')
+                            ->belowContent(fn (Refund $record) => $record->restocked ? 'Productos devueltos al stock' : null),
+                    ]),
+                ]),
                 Section::make('Historial')->schema([
                     RepeatableEntry::make('events')->label('Historial')->hiddenLabel()->columns(3)->schema([
                         TextEntry::make('created_at')->label('Fecha')->dateTime('d-m-Y H:i'),
@@ -139,14 +165,31 @@ class OrderResource extends Resource
             ."\n{$a['commune']}, {$a['region']}".(($a['reference'] ?? null) ? "\nReferencia: {$a['reference']}" : ''));
     }
 
+    public static function paymentDetail(Payment $payment): ?string
+    {
+        $parts = array_filter([
+            $payment->card_last4 ? "Tarjeta terminada en {$payment->card_last4}" : null,
+            $payment->payment_type ? (WebpayPlusGateway::PAYMENT_TYPES[$payment->payment_type] ?? null) : null,
+            ($payment->installments ?? 0) > 1 ? "{$payment->installments} cuotas" : null,
+            $payment->authorization_code ? "Autorización {$payment->authorization_code}" : null,
+            $payment->reference ? "Operación {$payment->reference}" : null,
+            $payment->gateway_order ? "Orden de compra {$payment->gateway_order}" : null,
+            $payment->failure_reason,
+        ]);
+
+        return $parts ? implode(' · ', $parts) : null;
+    }
+
     public static function eventDetail(OrderEvent $event): ?string
     {
         $p = $event->payload ?? [];
 
         return match ($event->type) {
             'payment_confirmed' => trim('Monto '.self::money($p['amount'] ?? null).(isset($p['reference']) ? " · Operación {$p['reference']}" : '')),
-            'cancelled' => $p['reason'] ?? null,
-            'placed' => 'Transferencia bancaria',
+            'cancelled', 'payment_failed', 'payment_aborted' => $p['reason'] ?? null,
+            'placed' => Payment::METHODS[$p['payment_method'] ?? 'bank_transfer'] ?? null,
+            'refunded' => trim('Monto '.self::money($p['amount'] ?? null).(isset($p['reason']) ? " · {$p['reason']}" : '').(! empty($p['restocked']) ? ' · Productos devueltos al stock' : '')),
+            'note' => $p['text'] ?? null,
             default => null,
         };
     }

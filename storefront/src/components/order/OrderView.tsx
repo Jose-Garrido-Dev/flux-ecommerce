@@ -1,6 +1,7 @@
 import Image from "next/image";
 import type { OrderDetail } from "@/lib/types";
 import { formatMoney, mediaUrl } from "@/lib/format";
+import { PayButton } from "./PayButton";
 
 const dateFormat = new Intl.DateTimeFormat("es-CL", { dateStyle: "long", timeStyle: "short", timeZone: "America/Santiago" });
 
@@ -9,8 +10,9 @@ export function formatDate(iso: string | null): string {
 }
 
 /** Detalle de un pedido: estado, datos de transferencia (si falta pagar), productos y totales. */
-export function OrderView({ order }: { order: OrderDetail }) {
+export function OrderView({ order, orderToken }: { order: OrderDetail; orderToken?: string }) {
   const transfer = order.payment.transfer;
+  const pay = order.payment;
   const address = order.shipping.address;
 
   return (
@@ -19,7 +21,23 @@ export function OrderView({ order }: { order: OrderDetail }) {
         <div className="flex flex-wrap gap-3">
           <Badge>{order.status_label}</Badge>
           <Badge tone={order.payment_status === "paid" ? "ok" : order.payment_status === "pending" ? "warn" : "muted"}>Pago: {order.payment_status_label}</Badge>
+          {pay.status === "failed" || pay.status === "aborted" ? <Badge tone="warn">Último intento: {pay.status_label}</Badge> : null}
         </div>
+
+        {pay.can_pay && orderToken && (
+          <section aria-labelledby="pagar-titulo" className="rounded-[var(--radius)] border-2 border-accent bg-surface p-6">
+            <h2 id="pagar-titulo" className="font-display text-3xl">
+              {pay.status === "pending" ? `Paga ${formatMoney(order.grand_total)} con ${pay.method}` : "Tu pago no se completó"}
+            </h2>
+            <p className="mt-2 text-sm text-muted">
+              {pay.status !== "pending" && pay.failure_reason ? `${pay.failure_reason} ` : ""}
+              Tus productos siguen reservados hasta el {formatDate(pay.expires_at)} (hora de Chile). Puedes intentarlo de nuevo con la misma u otra tarjeta.
+            </p>
+            <div className="mt-5">
+              <PayButton orderToken={orderToken} label={pay.status === "pending" ? `Pagar con ${pay.method}` : "Intentar pagar de nuevo"} />
+            </div>
+          </section>
+        )}
 
         {transfer && (
           <section aria-labelledby="pago-titulo" className="rounded-[var(--radius)] border-2 border-accent bg-surface p-6">
@@ -129,6 +147,14 @@ export function OrderView({ order }: { order: OrderDetail }) {
         <div className="border-t border-border pt-5 text-sm">
           <p className="label">Pago</p>
           <p className="mt-2">{order.payment.method}</p>
+          {pay.card_last4 && (
+            <p className="text-muted">
+              {pay.payment_type ?? "Tarjeta"} terminada en {pay.card_last4}
+              {pay.installments ? `, ${pay.installments} cuotas` : ""}
+            </p>
+          )}
+          {pay.authorization_code && <p className="text-muted">Código de autorización: {pay.authorization_code}</p>}
+          {pay.refunded_amount > 0 && <p className="text-muted">Reembolsado: {formatMoney(pay.refunded_amount)}</p>}
           {order.document_type && <p className="text-muted">Documento: {order.document_type === "factura" ? "Factura" : "Boleta"}</p>}
         </div>
       </aside>

@@ -10,6 +10,7 @@ use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Models\InventoryLevel;
 use App\Domain\Inventory\Models\Warehouse;
 use App\Domain\Inventory\Services\InventoryService;
+use App\Domain\Orders\Services\OrderPayments;
 use App\Domain\Orders\Services\PlaceOrder;
 use App\Domain\Shipping\Models\ShippingMethod;
 use App\Domain\System\Services\SettingsRepository;
@@ -149,6 +150,13 @@ class SpanishOnlyModalsTest extends TestCase
         $this->check('Cliente: bloquear', Livewire::test(ViewCustomer::class, ['record' => $customer->getRouteKey()])->mountAction('block'));
         $this->check('Envíos: nuevo', Livewire::test(ManageShippingMethods::class)->mountAction('create'));
         $this->check('Envíos: nuevo (vacío)', Livewire::test(ManageShippingMethods::class)->callAction('create', data: ['type' => null]));
+        app(OrderPayments::class)->confirm($order, $order->grand_total);
+        $this->check('Pedido: reembolsar', $viewOrder()->mountAction('refund'));
+        $this->check('Pedido: reembolsar (vacío)', $viewOrder()->callAction('refund', data: ['amount' => null, 'reason' => null]));
+        $this->check('Pedido: reembolsar de más', $viewOrder()->callAction('refund', data: ['amount' => 999999, 'reason' => 'x', 'restock' => false]));
+        $this->check('Pagos: credenciales de prueba', Livewire::test(PaymentSettingsPage::class)->mountAction('webpayTestCredentials'));
+        $this->check('Pagos: probar Webpay', Livewire::test(PaymentSettingsPage::class)->mountAction('webpayVerify'));
+        $this->check('Pagos: código de comercio inválido', Livewire::test(PaymentSettingsPage::class)->fillForm(['webpay_commerce_code' => 'abc'])->call('save'));
         $this->check('Pagos (vacío)', Livewire::test(PaymentSettingsPage::class)->fillForm(['bank_transfer_enabled' => true, 'bank_transfer_hours' => null])->call('save'));
 
         $this->assertSame([], array_values(array_unique($this->problems)),

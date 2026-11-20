@@ -2,6 +2,8 @@
 
 namespace App\Domain\Orders\Services;
 
+use App\Domain\Payments\Models\PaymentGateway;
+use App\Domain\Payments\Services\GatewayRegistry;
 use App\Domain\System\Services\SettingsRepository;
 
 /** Datos de la transferencia bancaria (Configuración → Pagos). */
@@ -43,13 +45,35 @@ class PaymentSettings
         ];
     }
 
-    /** Métodos de pago que ofrece el checkout. */
+    /**
+     * Métodos de pago que ofrece el checkout: pasarelas activas y verificadas, y la transferencia.
+     * test_mode avisa que la pasarela está en su ambiente de pruebas (no cobra de verdad).
+     */
     public function methods(): array
     {
-        return $this->transferEnabled() ? [[
-            'code' => 'bank_transfer',
-            'name' => 'Transferencia bancaria',
-            'description' => 'Te mostramos los datos al confirmar. Reservamos tus productos por '.$this->transferHours().' horas.',
-        ]] : [];
+        $registry = app(GatewayRegistry::class);
+        $methods = array_map(function (PaymentGateway $g) use ($registry) {
+            $driver = $registry->driver($g->code, $g);
+
+            return [
+                'code' => $g->code, 'type' => 'redirect', 'name' => $driver->checkoutName(),
+                'description' => $driver->checkoutDescription(), 'test_mode' => $g->isTestMode(),
+            ];
+        }, $registry->available());
+
+        if ($this->transferEnabled()) {
+            $methods[] = [
+                'code' => 'bank_transfer', 'type' => 'manual', 'name' => 'Transferencia bancaria',
+                'description' => 'Te mostramos los datos al confirmar. Reservamos tus productos por '.$this->transferHours().' horas.',
+                'test_mode' => false,
+            ];
+        }
+
+        return $methods;
+    }
+
+    public function isAvailable(string $code): bool
+    {
+        return $code === 'bank_transfer' ? $this->transferEnabled() : app(GatewayRegistry::class)->isAvailable($code);
     }
 }

@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
         __DIR__.'/../app/Domain/Inventory/Console',
         __DIR__.'/../app/Domain/Orders/Console',
+        __DIR__.'/../app/Domain/Payments/Console',
         __DIR__.'/../app/Domain/Shipping/Console',
     ])
     ->withMiddleware(function (Middleware $middleware): void {

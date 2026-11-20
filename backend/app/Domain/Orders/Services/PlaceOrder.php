@@ -10,6 +10,7 @@ use App\Domain\Inventory\Services\InventoryService;
 use App\Domain\Orders\Mail\NewOrderNotificationMail;
 use App\Domain\Orders\Mail\OrderPlacedMail;
 use App\Domain\Orders\Models\Order;
+use App\Domain\Payments\Services\PaymentProcessor;
 use App\Domain\Shipping\Models\Region;
 use App\Domain\Shipping\Models\ShippingMethod;
 use App\Domain\Shipping\Services\ShippingQuoter;
@@ -55,7 +56,8 @@ class PlaceOrder
             throw new CheckoutException('cart_changed', 'Algunos productos de tu carrito ya no están disponibles. Revisa el carrito.', 409, $summary);
         }
 
-        if (($input['payment_method'] ?? null) !== 'bank_transfer' || ! $this->payments->transferEnabled()) {
+        $paymentMethod = (string) ($input['payment_method'] ?? '');
+        if (! $this->payments->isAvailable($paymentMethod)) {
             throw new CheckoutException('payment_unavailable', 'El medio de pago elegido no está disponible.', 422);
         }
 
@@ -80,10 +82,12 @@ class PlaceOrder
 
         $uuid = (string) Str::uuid();
         $token = OrderTokens::for($uuid);
-        $hours = $this->payments->transferHours();
+        // Transferencia: plazo configurable (horas). Pasarela: el cliente paga en el momento.
+        $manual = $paymentMethod === 'bank_transfer';
+        $minutes = $manual ? $this->payments->transferHours() * 60 : PaymentProcessor::GATEWAY_MINUTES;
 
         try {
-            $order = DB::transaction(function () use ($cart, $input, $customer, $idempotencyKey, $uuid, $token, $lines, $subtotal, $ship, $itemsTax, $grandTotal, $method, $region, $needsAddress, $hours, $ip) {
+            $order = DB::transaction(function () use ($cart, $input, $customer, $idempotencyKey, $uuid, $token, $lines, $subtotal, $ship, $itemsTax, $grandTotal, $method, $region, $needsAddress, $minutes, $paymentMethod, $ip) {
                 $order = new Order([
                     'idempotency_key' => $idempotencyKey,
                     'customer_id' => $customer?->id,
@@ -124,7 +128,7 @@ class PlaceOrder
                         'line_total' => $line['line_total'],
                     ]);
                     // Reserva atómica: si otra compra se llevó la última unidad, falla y se deshace todo el pedido
-                    $this->inventory->reserve($line['variant_id'], $line['quantity'], 'order', $uuid, $hours * 60);
+                    $this->inventory->reserve($line['variant_id'], $line['quantity'], 'order', $uuid, $minutes);
                 }
 
                 $order->shippingLine()->create([
@@ -132,13 +136,14 @@ class PlaceOrder
                     'amount' => $ship['amount'], 'tax_amount' => $ship['tax_amount'], 'estimated_days' => $method->estimated_days,
                 ]);
                 $order->payments()->create([
-                    'method_code' => 'bank_transfer', 'amount' => $grandTotal, 'expires_at' => now()->addHours($hours),
+                    'method_code' => $paymentMethod, 'amount' => $grandTotal, 'expires_at' => now()->addMinutes($minutes),
+                    'gateway_order' => $paymentMethod === 'bank_transfer' ? null : $order->number.'-1',
                 ]);
                 Consent::query()->create([
                     'customer_id' => $customer?->id, 'email' => $order->email, 'purpose' => 'terms', 'granted' => true,
                     'source' => 'checkout', 'ip' => $ip, 'text_version' => (string) app(SettingsRepository::class)->get('legal', 'terms_version', '1'),
                 ]);
-                OrderEvents::record($order, 'placed', ['payment_method' => 'bank_transfer'], visible: true, to: 'pending', actor: $customer ? 'customer' : 'system');
+                OrderEvents::record($order, 'placed', ['payment_method' => $paymentMethod], visible: true, to: 'pending', actor: $customer ? 'customer' : 'system');
                 $cart->update(['status' => 'converted', 'email' => $order->email]);
                 app(AuditLogger::class)->record('Order.placed', $order, [], ['number' => $order->number, 'total' => $grandTotal]);
 
@@ -158,9 +163,12 @@ class PlaceOrder
         }
 
         $order->refresh();
-        Mail::to($order->email)->queue(new OrderPlacedMail($order));
-        if ($notify = app(SettingsRepository::class)->get('business', 'contact_email')) {
-            Mail::to($notify)->queue(new NewOrderNotificationMail($order));
+        // Con pasarela, los correos salen cuando el pago se confirma (OrderPayments::markPaid)
+        if ($manual) {
+            Mail::to($order->email)->queue(new OrderPlacedMail($order));
+            if ($notify = app(SettingsRepository::class)->get('business', 'contact_email')) {
+                Mail::to($notify)->queue(new NewOrderNotificationMail($order));
+            }
         }
 
         return $order;

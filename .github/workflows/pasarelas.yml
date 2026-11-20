@@ -1,0 +1,112 @@
+name: Pasarelas (prueba real)
+
+# Prueba real contra el ambiente de integración de Transbank: crea pedidos, paga en el formulario
+# de Webpay con las tarjetas de prueba públicas, pasa por el simulador del banco y vuelve a la tienda.
+# Corre cuando cambia el código de pagos, una vez por semana y a pedido (Actions → Ejecutar).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 11 * * 1"
+  pull_request:
+    paths:
+      - "backend/app/Domain/Payments/**"
+      - "backend/app/Domain/Orders/**"
+      - "backend/app/Http/Controllers/Webhooks/**"
+      - "storefront/src/lib/pay.ts"
+      - "storefront/src/components/order/**"
+      - "storefront/src/components/checkout/**"
+      - "packages/qa/e2e/**"
+      - ".github/workflows/pasarelas.yml"
+
+concurrency:
+  group: pasarelas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  webpay:
+    name: Webpay Plus (integración de Transbank)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: flux
+          POSTGRES_USER: flux
+          POSTGRES_PASSWORD: flux
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U flux -d flux"
+          --health-interval 5s --health-retries 10
+    env:
+      APP_ENV: local
+      APP_URL: http://127.0.0.1:8000
+      FLUX_STOREFRONT_URL: http://127.0.0.1:3000
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_DATABASE: flux
+      DB_USERNAME: flux
+      DB_PASSWORD: flux
+      MAIL_MAILER: log
+      QUEUE_CONNECTION: sync
+      PHP_CLI_SERVER_WORKERS: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_pgsql, intl, zip, gd, bcmath
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: storefront/package-lock.json
+
+      - name: Backend con catálogo de demostración
+        working-directory: backend
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          cp .env.example .env
+          php artisan key:generate
+          php artisan migrate --seed --force
+          php artisan flux:demo
+          php artisan storage:link
+          nohup php artisan serve --host=127.0.0.1 --port=8000 > ../backend.log 2>&1 &
+
+      - name: Verificar Webpay contra Transbank (transacción de prueba de $50)
+        working-directory: backend
+        run: php artisan payments:verify webpay_plus --integration --enable
+
+      - name: Tienda
+        working-directory: storefront
+        env:
+          FLUX_API_INTERNAL_URL: http://127.0.0.1:8000
+          NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+        run: |
+          npm ci
+          npm run build
+          nohup npm start -- -H 127.0.0.1 -p 3000 > ../storefront.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:3000 -o /dev/null && break; sleep 2; done
+
+      - name: Navegador de pruebas
+        working-directory: packages/qa/e2e
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Pagar, rechazar, reintentar, anular y reembolsar en Webpay
+        working-directory: packages/qa/e2e
+        run: node webpay-integracion.mjs
+
+      - name: Evidencia
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencia-webpay
+          path: |
+            packages/qa/e2e/evidencia
+            backend.log
+            storefront.log
+            backend/storage/logs/*.log
+          retention-days: 30

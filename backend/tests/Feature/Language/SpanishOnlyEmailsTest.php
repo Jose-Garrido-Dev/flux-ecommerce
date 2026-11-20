@@ -7,7 +7,9 @@ use App\Domain\Customers\Models\Customer;
 use App\Domain\Orders\Mail\NewOrderNotificationMail;
 use App\Domain\Orders\Mail\OrderPlacedMail;
 use App\Domain\Orders\Mail\PaymentConfirmedMail;
+use App\Domain\Orders\Mail\RefundMail;
 use App\Domain\Orders\Models\Order;
+use App\Domain\Payments\Models\Refund;
 use App\Domain\System\Services\SettingsRepository;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -46,6 +48,7 @@ class SpanishOnlyEmailsTest extends TestCase
             new OrderPlacedMail($order),
             new PaymentConfirmedMail($order),
             new NewOrderNotificationMail($order),
+            new RefundMail($order, new Refund(['amount' => 1000, 'reason' => 'Demora'])),
             new CustomerMail($customer, 'verify', 'https://tienda.test/cuenta/verificar'),
             new CustomerMail($customer, 'reset', 'https://tienda.test/cuenta/restablecer'),
         ];

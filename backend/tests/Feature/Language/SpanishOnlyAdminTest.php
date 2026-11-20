@@ -12,6 +12,8 @@ use App\Domain\Inventory\Models\Warehouse;
 use App\Domain\Inventory\Services\InventoryService;
 use App\Domain\Orders\Services\OrderPayments;
 use App\Domain\Orders\Services\PlaceOrder;
+use App\Domain\Payments\Models\PaymentGateway;
+use App\Domain\Payments\Services\RefundService;
 use App\Domain\Shipping\Models\Region;
 use App\Domain\Shipping\Models\ShippingMethod;
 use App\Domain\System\Services\SettingsRepository;
@@ -68,6 +70,12 @@ class SpanishOnlyAdminTest extends TestCase
             'address' => ['recipient' => 'Ana', 'phone' => '912345678', 'street' => 'Los Leones', 'number' => '1', 'region_code' => 'CL-RM', 'commune' => 'Providencia'],
         ], $customer, 'clave');
         app(OrderPayments::class)->confirm($order, $order->grand_total, 'OP-1');
+        app(RefundService::class)->refund($order, 1000, 'Descuento por demora');
+        // Webpay verificada (pantalla de configuración con estado)
+        $webpay = PaymentGateway::for('webpay_plus');
+        $webpay->credentials = ['commerce_code' => '597055555532', 'api_key' => 'x'];
+        $webpay->save();
+        $webpay->update(['enabled' => true, 'verified_at' => now(), 'verified_environment' => 'integration', 'verified_fingerprint' => $webpay->fingerprint()]);
         $records = [
             'orders' => $order, 'customers' => $customer,
             'stock-transfers' => $transfer,

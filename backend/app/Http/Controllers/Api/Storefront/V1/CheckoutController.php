@@ -107,6 +107,9 @@ class CheckoutController extends StorefrontController
             'grand_total' => $order->grand_total,
             'status' => $order->status,
             'payment_status' => $order->payment_status,
+            'payment_method' => $method = $order->latestPayment?->method_code,
+            // pay: hay que llevar al cliente a la pasarela (POST /orders/{token}/pay); instructions: mostrar los datos de transferencia
+            'next' => $method === 'bank_transfer' || $order->payment_status === 'paid' ? 'instructions' : 'pay',
         ]], $order->wasRecentlyCreated ? 201 : 200);
     }
 
