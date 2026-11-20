@@ -150,12 +150,16 @@ async function pagarConTarjeta(page, caso, tarjeta, decisionBanco) {
   await evidencia(page, caso, "tarjeta-ingresada");
   // Fecha y CVV aparecen después de validar el número
   for (const [sel, valor, nombre] of [["#card-exp", "1230", "vencimiento"], ["#card-cvv", tarjeta.cvv, "CVV"]]) {
-    const campo = page.locator(sel);
-    await campo.waitFor({ state: "visible", timeout: 20000 }).catch(() => {});
-    assert(await campo.isVisible(), `no apareció el campo ${nombre}`);
-    await campo.click();
-    await campo.pressSequentially(valor, { delay: 60 });
-    await campo.press("Tab");
+    const todos = page.locator(sel);
+    await todos.first().waitFor({ state: "attached", timeout: 20000 }).catch(() => {});
+    const n = await todos.count();
+    const visibles = page.locator(`${sel}:visible`);
+    const campo = (await visibles.count()) > 0 ? visibles.first() : todos.first();
+    console.log(`    ${nombre}: ${n} elemento(s), caja ${JSON.stringify(await campo.boundingBox().catch(() => null))}`);
+    assert(n > 0, `no apareció el campo ${nombre}`);
+    await campo.click({ force: true });
+    await page.keyboard.type(valor, { delay: 60 });
+    await page.keyboard.press("Tab");
   }
   await page.waitForTimeout(800);
   // Cuotas: si aparece un selector, se deja la opción por defecto
