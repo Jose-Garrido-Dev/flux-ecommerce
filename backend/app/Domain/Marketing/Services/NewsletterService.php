@@ -44,7 +44,7 @@ class NewsletterService
                 'confirm_sent_at' => now(),
                 'unsubscribed_at' => null,
             ])->save();
-            Consent::query()->create(['customer_id' => $subscriber->customer_id, 'email' => $email, 'purpose' => 'marketing', 'granted' => true, 'source' => "newsletter_$source", 'ip' => $ip, 'text_version' => 'pendiente_confirmacion']);
+            Consent::query()->create(['customer_id' => $subscriber->customer_id, 'email' => $email, 'purpose' => 'marketing', 'granted' => true, 'source' => "newsletter_$source", 'ip' => $ip, 'text_version' => 'por_confirmar']);
             Mail::to($email)->queue(new NewsletterConfirmMail($subscriber, $this->storefrontUrl('/newsletter/confirmar?token='.$token)));
 
             return $subscriber;
