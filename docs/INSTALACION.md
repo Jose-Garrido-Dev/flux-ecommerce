@@ -202,6 +202,7 @@ Nunca subas archivos `.env` al repositorio: contienen claves. El `.gitignore` ya
 | `APP_TIMEZONE` | `America/Santiago` | Zona horaria de la tienda |
 | `APP_LOCALE` | `es` | Idioma |
 | `FLUX_STOREFRONT_URL` | `https://www.mitienda.cl` | URL de la tienda; se usa para enlaces en correos y CORS |
+| `FLUX_STOREFRONT_INTERNAL_URL` | `http://storefront:3000` (Docker) | Dirección de la tienda vista desde el servidor. Laravel la usa para avisarle que refresque su caché al publicar páginas, menús o temas. Sin ella la tienda igual se actualiza sola en pocos minutos |
 | `FLUX_REVALIDATE_SECRET` | texto largo aleatorio | Secreto compartido con Next.js. Sirve para dos cosas: refrescar páginas cuando cambian productos, y que el servidor de la tienda no quede limitado por `FLUX_STOREFRONT_RATE_LIMIT` (todas las visitas le llegan a Laravel desde la misma IP) |
 | `FLUX_STOREFRONT_RATE_LIMIT` | `120` | Consultas por minuto a la API pública permitidas a cada IP que **no** sea el servidor de la tienda |
 | `DB_CONNECTION` | `pgsql` | Motor de base de datos |
@@ -549,7 +550,8 @@ Los cambios se ven en la tienda en hasta 5 minutos (o al instante si la revalida
 ### 9.2 Tipografía y colores de la tienda
 
 - La tipografía (Bricolage Grotesque, licencia libre OFL) está dentro del proyecto en `storefront/src/app/fonts` y la sirve el propio servidor: no se usa Google Fonts ni otro servicio externo.
-- Los colores y formas están en variables al inicio de `storefront/src/app/globals.css` (tema "Lapislázuli", con modo oscuro automático). Para cambiar la identidad de un cliente basta con cambiar esas variables; en la Fase 9 se podrán editar desde el panel.
+- Desde la Fase 9 el tema se elige en **Contenido → Temas**: Lapislázuli (el de siempre), Minimalista, Fashion, Streetwear, Tecnología, Lujo y Hogar, cada uno con modo oscuro. Ahí también se ajustan el color principal y el del titular de la portada; al guardar se revisa que el texto se lea bien (contraste 4,5 a 1). Los temas con serifa usan fuentes del sistema del cliente: no se descarga nada de servicios externos.
+- Las variables al inicio de `storefront/src/app/globals.css` son el tema por defecto y el respaldo si la API no responde.
 
 ### 9.3 Cargar el catálogo
 
@@ -595,6 +597,21 @@ Las imágenes se guardan en el disco del servidor, en `backend/storage/app/publi
 3. **Configuración → Datos del negocio → Correo de contacto**: ahí llegan los avisos de pedidos nuevos y de solicitudes de devolución.
 
 El detalle de cada pantalla está en el manual del panel (botón **Manual** en cada página): *Correos* y *Devoluciones y cambios*.
+
+### 9.5 Portada, páginas y menús (Fase 9)
+
+1. **Contenido → Páginas → Crear portada editable**: crea un borrador con los mismos bloques de la portada fija. Cambia textos e imágenes, usa **Vista previa** y luego **Publicar**. Mientras no publiques una portada, la tienda muestra la fija.
+2. Crea las páginas institucionales (Quiénes somos, Términos y condiciones, Cambios y devoluciones). Quedan en `https://tu-tienda.cl/nombre-de-la-pagina`.
+3. **Contenido → Menús**: arma el menú del encabezado (si lo dejas vacío se muestran las categorías) y el del pie (por ejemplo, enlaces a las páginas institucionales).
+4. **Contenido → Biblioteca**: todas las imágenes de la tienda, con carpetas, texto alternativo y *Dónde se usa*. Se guardan en `backend/storage/app/public` (inclúyelo en los respaldos).
+
+**Cambios al instante.** Al publicar una página, guardar un menú o cambiar el tema, Laravel avisa a la tienda para que refresque su caché. Para eso necesita:
+- `FLUX_STOREFRONT_INTERNAL_URL` y `FLUX_REVALIDATE_SECRET` en el `.env` del backend, y el mismo secreto en `REVALIDATE_SECRET` de la tienda (sección 5);
+- el *worker* de colas funcionando (sección 7.1), porque el aviso se envía en segundo plano con 3 intentos.
+
+Sin eso, los cambios igual aparecen solos en 5 a 10 minutos.
+
+**Vista previa.** El botón *Vista previa* abre `/vista-previa/...` en la tienda con un enlace firmado que vence en 2 horas. Requiere que `FLUX_STOREFRONT_URL` apunte a la dirección pública de la tienda.
 
 ## 10. Pruebas y calidad
 

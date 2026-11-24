@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { getMenu, getStore } from "@/lib/catalog";
+import { getMenus, themeCss } from "@/lib/content";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { AnnouncementBar } from "@/components/site/AnnouncementBar";
@@ -41,22 +42,25 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [store, menu] = await Promise.all([getStore(), getMenu()]);
+  const [store, menu, menus] = await Promise.all([getStore(), getMenu(), getMenus()]);
+  const theme = themeCss(store?.theme);
 
   return (
     <html lang="es-CL" className={bricolage.variable} suppressHydrationWarning>
       <head>
         {/* Marca que hay JavaScript: solo entonces se ocultan los elementos que aparecen al hacer scroll */}
         <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
+        {/* Tema activo elegido en el panel (Contenido → Temas): solo colores #rrggbb validados y valores numéricos */}
+        {theme && <style id="tema" dangerouslySetInnerHTML={{ __html: theme }} />}
       </head>
       <body className="flex min-h-dvh flex-col antialiased">
         <CartProvider>
           <AnnouncementBar messages={store?.announcements ?? []} />
-          <Header storeName={store?.name ?? "Tienda"} menu={menu} />
+          <Header storeName={store?.name ?? "Tienda"} menu={menu} links={menus.header} />
           <main id="contenido" className="flex-1">
             {children}
           </main>
-          <Footer store={store} menu={menu} />
+          <Footer store={store} menu={menu} links={menus.footer} />
           <CartDrawer />
         </CartProvider>
         <RevealObserver />

@@ -21,6 +21,8 @@ final class Labels
         'Payment' => 'Pago', 'Address' => 'Dirección', 'PaymentGateway' => 'Pasarela de pago', 'Refund' => 'Reembolso',
         'ShippingZone' => 'Zona de envío', 'ShippingRate' => 'Tarifa de envío', 'Courier' => 'Courier', 'Shipment' => 'Despacho',
         'ShippingIncident' => 'Incidencia de despacho', 'ReturnRequest' => 'Devolución', 'EmailTemplate' => 'Plantilla de correo',
+        'Page' => 'Página', 'PageVersion' => 'Versión de página', 'Menu' => 'Menú', 'MenuItem' => 'Enlace de menú', 'Theme' => 'Tema',
+        'Media' => 'Imagen', 'MediaFolder' => 'Carpeta de imágenes',
     ];
 
     public const VERBS = [
@@ -29,6 +31,7 @@ final class Labels
         'placed' => 'creado', 'payment_confirmed' => 'pago confirmado', 'cancelled' => 'cancelado',
         'blocked' => 'bloqueo', 'unblocked' => 'desbloqueo', 'refunded' => 'reembolso', 'payment_failed' => 'pago rechazado', 'verified' => 'verificación',
         'in_review' => 'en revisión', 'approved' => 'aprobada', 'rejected' => 'rechazada', 'received' => 'recibida', 'processed' => 'resuelta', 'closed' => 'cerrada',
+        'published' => 'publicación', 'unpublished' => 'despublicación', 'restored' => 'restauración', 'activated' => 'activación',
     ];
 
     public const ACTORS = ['user' => 'Usuario', 'system' => 'Sistema', 'provider' => 'Proveedor', 'customer' => 'Cliente'];

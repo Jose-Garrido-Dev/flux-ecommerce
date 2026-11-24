@@ -4,6 +4,7 @@ import type { ProductCard } from "@/lib/types";
 import { formatMoney, mediaUrl } from "@/lib/format";
 import { Container } from "@/components/ui/Container";
 import { Parallax } from "@/components/motion/Parallax";
+import { CmsLink } from "@/components/cms/CmsLink";
 
 /** Divide el titular en palabras para animarlas una a una (solo transform, sin ocultar el texto). */
 function AnimatedHeadline({ text }: { text: string }) {
@@ -33,12 +34,16 @@ const SLOTS = [
 
 export function Hero({
   title,
+  subtitle = null,
   products,
   firstCategory,
+  cta = { label: "Ver catálogo", href: "/catalogo" },
 }: {
   title: string;
+  subtitle?: string | null;
   products: ProductCard[];
   firstCategory: { name: string; slug: string } | null;
+  cta?: { label: string; href: string } | null;
 }) {
   const showcase = products.filter((p) => p.image).slice(0, 3);
 
@@ -50,13 +55,20 @@ export function Hero({
           <h1 className="font-display text-[clamp(3.4rem,10vw,9rem)]">
             <AnimatedHeadline text={title} />
           </h1>
+          {subtitle && (
+            <p className="fade-up mt-6 max-w-xl text-lg text-field-muted sm:text-xl" style={{ animationDelay: "400ms" }}>
+              {subtitle}
+            </p>
+          )}
           <div className="fade-up mt-10 flex flex-wrap items-center gap-3" style={{ animationDelay: "500ms" }}>
-            <Link
-              href="/catalogo"
-              className="inline-flex h-14 items-center rounded-full bg-field-fg px-8 text-[0.95rem] font-semibold text-field transition-transform hover:scale-[1.03]"
-            >
-              Ver catálogo
-            </Link>
+            {cta && (
+              <CmsLink
+                href={cta.href}
+                className="inline-flex h-14 items-center rounded-full bg-field-fg px-8 text-[0.95rem] font-semibold text-field transition-transform hover:scale-[1.03]"
+              >
+                {cta.label}
+              </CmsLink>
+            )}
             {firstCategory && (
               <Link
                 href={`/categoria/${firstCategory.slug}`}

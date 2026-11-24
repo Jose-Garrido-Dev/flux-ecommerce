@@ -7,6 +7,8 @@ use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Services\ProductPresenter;
 use App\Domain\Catalog\Services\ProductSearch;
+use App\Domain\Content\Models\Page;
+use App\Domain\Content\Services\PagePresenter;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -184,6 +186,9 @@ class CatalogController extends Controller
             'brands' => Brand::query()->active()->where('show_on_home', true)->with('logo')
                 ->orderBy('position')->limit(12)->get()
                 ->map(fn (Brand $b) => $this->brandCard($b))->all(),
+            // Portada del constructor de páginas (Fase 9). null = la tienda usa la portada fija.
+            'page' => ($page = Page::query()->published()->where('type', 'home')->with('publishedVersion')->first())
+                ? app(PagePresenter::class)->present($page, $page->publishedVersion) : null,
         ]]);
     }
 

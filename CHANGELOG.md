@@ -17,6 +17,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ### Agregado
 
+- Fase 9 (contenido y personalización):
+  - **Contenido → Páginas**: portada, páginas de campaña e institucionales armadas con bloques, sin código. 12 tipos de bloque, validados con el mismo esquema en Laravel y en la tienda (`backend/resources/cms/blocks.json`, copia en `storefront/src/lib/cms-blocks.json`; una prueba revisa que sean iguales).
+  - Versiones: cada guardado crea una versión que no se puede modificar. Restaurar copia una versión anterior como nueva; también se puede publicar una versión anterior directamente.
+  - Vista previa del borrador en la tienda (`/vista-previa/...`) con enlace firmado que vence en 2 horas, sin caché y fuera de los buscadores.
+  - **Crear portada editable** a partir de la portada fija. Sin portada publicada la tienda sigue mostrando la fija.
+  - **Contenido → Menús**: menú del encabezado (con submenú) y del pie. Vacíos, la tienda usa las categorías.
+  - **Contenido → Biblioteca**: imágenes con carpetas, texto alternativo, subida múltiple y *Dónde se usa*. No se puede eliminar una imagen en uso.
+  - **Contenido → Temas**: 7 temas con modo oscuro y ajuste de colores con revisión de contraste.
+  - La tienda refresca su caché al publicar páginas, menús o temas (aviso en cola a `/api/revalidate`). Nueva variable `FLUX_STOREFRONT_INTERNAL_URL`.
+  - API: `GET /menus`, `GET /pages/{slug}`, `GET /preview/{token}`; `/home` agrega `page` y `/store` agrega `theme`.
+  - Manuales: Páginas, Menús, Biblioteca y Temas.
 - Fase 8 (pedidos, devoluciones y correos):
   - Reglas de estado del pedido en un solo lugar: cada cambio prohibido responde 422 con el motivo en español (por ejemplo, completar sin entregar o cancelar un pedido pagado sin reembolso).
   - El cliente puede cancelar su pedido mientras no lo pague, desde *Mi cuenta* o el enlace del correo, y recibe un correo con el motivo. La cancelación desde el panel, y la automática por plazo vencido, también envían ese correo.

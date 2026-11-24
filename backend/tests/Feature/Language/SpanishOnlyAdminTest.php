@@ -6,6 +6,8 @@ use App\Domain\Cart\Services\CartService;
 use App\Domain\Catalog\Models\Attribute;
 use App\Domain\Catalog\Models\Brand;
 use App\Domain\Catalog\Models\Category;
+use App\Domain\Content\Models\Menu;
+use App\Domain\Content\Services\PageService;
 use App\Domain\Customers\Models\Customer;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Models\Warehouse;
@@ -93,11 +95,19 @@ class SpanishOnlyAdminTest extends TestCase
         $return = $returns->request($order->fresh(), [$order->items->first()->id => 1], 'return', 'defective', 'Llegó con una mancha', actor: 'user');
         $returns->approve($return, 'Envíala a la tienda.');
         EmailTemplate::syncDefaults();
+        $page = app(PageService::class)->create(['title' => 'Nosotros', 'slug' => 'nosotros'], [
+            ['type' => 'hero', 'data' => ['title' => 'Hechos en Chile']], ['type' => 'faq', 'data' => ['items' => [['question' => '¿Envían?', 'answer' => 'Sí']]]],
+        ]);
+        app(PageService::class)->publish($page);
+        app(PageService::class)->saveVersion($page, [['type' => 'rich_text', 'data' => ['body' => 'Hola']]]);
+        Menu::for('header')->items()->create(['label' => 'Catálogo', 'link_type' => 'catalog', 'position' => 0]);
+
         $records = [
             'orders' => $order, 'returns' => $return, 'email-templates' => EmailTemplate::query()->where('key', 'order_placed')->first(), 'customers' => $customer, 'shipments' => $shipment,
             'stock-transfers' => $transfer,
             'products' => $product, 'categories' => $category, 'brands' => $brand,
             'attributes' => Attribute::query()->first(), 'users' => $admin, 'regions' => Region::query()->first(),
+            'pages' => $page, 'menus' => Menu::for('header'),
         ];
 
         $urls = [];
@@ -123,6 +133,7 @@ class SpanishOnlyAdminTest extends TestCase
         $urls[] = '/admin/products/'.$product->getRouteKey().'/edit?relation=0';
         $urls[] = '/admin/products/'.$product->getRouteKey().'/edit?relation=1';
         $urls[] = '/admin/products/'.$product->getRouteKey().'/edit?relation=2';
+        $urls[] = '/admin/pages/'.$page->getRouteKey().'/edit?relation=0';
 
         $problems = [];
         foreach (array_unique($urls) as $url) {

@@ -10,10 +10,11 @@ import { CategoryBento } from "@/components/home/CategoryBento";
 import { SaleSection } from "@/components/home/SaleSection";
 import { SectionHeading } from "@/components/home/SectionHeading";
 import { Marquee } from "@/components/home/Marquee";
+import { BlockRenderer } from "@/components/cms/BlockRenderer";
 
 async function getHome(): Promise<HomeData | null> {
   try {
-    const home = await apiGet<HomeData>("/home", { tags: ["catalog", "home"], revalidate: 120 });
+    const home = await apiGet<HomeData>("/home", { tags: ["catalog", "home", "pages"], revalidate: 120 });
     // Tolera un backend sin actualizar (o una respuesta en caché anterior) que aún no envía on_sale
     return { ...home, on_sale: home.on_sale ?? [] };
   } catch {
@@ -21,7 +22,10 @@ async function getHome(): Promise<HomeData | null> {
   }
 }
 
-/** Portada con bloques fijos (Fase 2). En la Fase 9 los bloques vienen del constructor de páginas. */
+/**
+ * Portada. Si en el panel hay una portada publicada (Contenido → Páginas), se dibujan sus bloques;
+ * si no, la portada fija con destacados, ofertas, novedades y marcas.
+ */
 export default async function Home() {
   // Se arma en cada visita con datos en caché: así nunca queda "congelada" una portada vacía del build
   await connection();
@@ -36,6 +40,10 @@ export default async function Home() {
         </section>
       </Container>
     );
+  }
+
+  if (home?.page && home.page.blocks.length > 0) {
+    return <BlockRenderer blocks={home.page.blocks} />;
   }
 
   const empty = !home || (home.featured.length === 0 && home.newest.length === 0);
