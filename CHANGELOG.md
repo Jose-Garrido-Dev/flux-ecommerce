@@ -6,6 +6,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ### Corregido
 
+- El error 409 del checkout (precio o carrito cambiado) devolvía el costo de los productos en el resumen del carrito. Ya no se incluye.
+- Contrato de la API: 9 descripciones con comas rompían el YAML.
+
 - El resumen de errores que Laravel agrega a las respuestas de la API salía en inglés ("(and 10 more errors)"). Ahora dice "(y 10 errores más)".
 - Textos en inglés que se veían en el panel:
   - La etiqueta "Attribute values" en la pestaña Especificaciones.
@@ -17,6 +20,18 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ### Agregado
 
+- Fase 10 (marketing, cupones y SEO):
+  - **Marketing → Cupones**: porcentaje (con tope), monto fijo o envío gratis; vigencia, compra mínima, usos totales y por cliente, solo primera compra, productos, categorías y marcas incluidos o excluidos.
+  - **Marketing → Promociones**: descuentos automáticos por monto, por colección, por cantidad y "lleva X, paga menos", con prioridad y combinación.
+  - El descuento se reparte por producto: el IVA se calcula sobre lo pagado y una devolución reembolsa lo que el cliente realmente pagó. El cupón se vuelve a revisar con bloqueo al pagar.
+  - Tienda: campo de cupón en el carrito y en el pago, filas de descuento, envío gratis tachado y descuentos en el detalle del pedido.
+  - **Marketing → Boletín** con doble confirmación (formulario en el pie, casilla al comprar y en Mi cuenta), consentimiento registrado, baja por enlace y en un clic, y exportación CSV.
+  - **Marketing → Campañas** (audiencia, prueba, programación, envío en lotes, cancelación, reintento, clics) y **Automatizaciones** (bienvenida, carrito abandonado, después de la compra). Nueva plantilla editable *Confirmar suscripción*.
+  - **Marketing → WhatsApp**: botón flotante con enlace wa.me.
+  - **Contenido → Blog** (`/blog`, categorías, programación, Article) y **SEO y redirecciones** (301/302, automáticas al cambiar una URL).
+  - `/sitemap.xml`, `/robots.txt` y datos estructurados Organization.
+  - API 0.11.0: `/cart/coupon`, `/newsletter*`, `/blog/posts*`, `/seo/*`; `/store` agrega `whatsapp`.
+  - Manuales: Cupones, Promociones, Boletín, Campañas, Automatizaciones, WhatsApp, Blog y Redirecciones.
 - Fase 9 (contenido y personalización):
   - **Contenido → Páginas**: portada, páginas de campaña e institucionales armadas con bloques, sin código. 12 tipos de bloque, validados con el mismo esquema en Laravel y en la tienda (`backend/resources/cms/blocks.json`, copia en `storefront/src/lib/cms-blocks.json`; una prueba revisa que sean iguales).
   - Versiones: cada guardado crea una versión que no se puede modificar. Restaurar copia una versión anterior como nueva; también se puede publicar una versión anterior directamente.

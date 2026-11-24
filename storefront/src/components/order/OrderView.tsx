@@ -128,6 +128,12 @@ export function OrderView({ order, orderToken, apiBase }: { order: OrderDetail; 
             <dt className="text-muted">Productos</dt>
             <dd className="tabular-nums">{formatMoney(order.subtotal)}</dd>
           </div>
+          {(order.discounts ?? []).map((d) => (
+            <div key={`${d.label}-${d.target}`} className="flex justify-between text-accent">
+              <dt>{d.target === "shipping" ? `${d.label} (despacho)` : d.label}</dt>
+              <dd className="tabular-nums">−{formatMoney(d.amount)}</dd>
+            </div>
+          ))}
           <div className="flex justify-between">
             <dt className="text-muted">Despacho</dt>
             <dd className="tabular-nums">{order.shipping_total === 0 ? "Gratis" : formatMoney(order.shipping_total)}</dd>

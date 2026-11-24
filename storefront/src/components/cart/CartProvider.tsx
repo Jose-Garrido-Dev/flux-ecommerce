@@ -15,6 +15,9 @@ type CartContextValue = {
   add: (sku: string, quantity?: number) => Promise<boolean>;
   setQuantity: (sku: string, quantity: number) => Promise<boolean>;
   remove: (sku: string) => Promise<boolean>;
+  /** Aplica un cupón. Devuelve el motivo si no aplica, o null si quedó aplicado. */
+  applyCoupon: (code: string) => Promise<string | null>;
+  removeCoupon: () => Promise<void>;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -70,6 +73,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       },
       setQuantity: (sku, quantity) => run(bff<Cart>(`cart/items/${encodeURIComponent(sku)}`, { method: "PATCH", body: { quantity } })),
       remove: (sku) => run(bff<Cart>(`cart/items/${encodeURIComponent(sku)}`, { method: "DELETE" })),
+      applyCoupon: async (code) => {
+        const res = await bff<Cart>("cart/coupon", { method: "POST", body: { code } });
+        if (res.ok && res.data) {
+          setCart(res.data);
+          return null;
+        }
+        return res.errors.code ?? res.message ?? "No pudimos aplicar el cupón.";
+      },
+      removeCoupon: async () => {
+        const res = await bff<Cart>("cart/coupon", { method: "DELETE" });
+        if (res.ok && res.data) setCart(res.data);
+      },
     }),
     [cart, loading, open, error, refresh, run],
   );

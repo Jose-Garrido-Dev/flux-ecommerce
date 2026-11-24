@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Flux Storefront API
-  version: 0.10.0
+  version: 0.11.0
   description: >
     Contrato entre el backend Laravel y el storefront Next.js.
     Todo endpoint nuevo se agrega aquí antes de implementarse.
@@ -140,12 +140,12 @@ paths:
       parameters:
         - { name: category, in: query, schema: { type: string }, description: Slug; incluye subcategorías }
         - { name: brand, in: query, schema: { type: string } }
-        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: Busca en nombre, descripción corta, marca y SKU }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: "Busca en nombre, descripción corta, marca y SKU" }
         - { name: sort, in: query, schema: { type: string, enum: [relevance, newest, price_asc, price_desc, name] } }
         - { name: featured, in: query, schema: { type: boolean } }
         - { name: on_sale, in: query, schema: { type: boolean }, description: Solo productos con una oferta vigente }
         - { name: in_stock, in: query, schema: { type: boolean }, description: "Solo productos con al menos una variante comprable (con stock, sin control de stock o con sobreventa)" }
-        - { name: min_price, in: query, schema: { type: integer, minimum: 0 }, description: Precio vigente con IVA, en CLP }
+        - { name: min_price, in: query, schema: { type: integer, minimum: 0 }, description: "Precio vigente con IVA, en CLP" }
         - { name: max_price, in: query, schema: { type: integer, minimum: 0 } }
         - name: filter
           in: query
@@ -282,7 +282,7 @@ paths:
                 quantity: { type: integer, minimum: 1, maximum: 99 }
       responses:
         "201": { $ref: "#/components/responses/Cart" }
-        "422": { description: Producto no disponible, sin precio o sin stock suficiente }
+        "422": { description: "Producto no disponible, sin precio o sin stock suficiente" }
   /storefront/v1/cart/items/{sku}:
     parameters:
       - { name: sku, in: path, required: true, schema: { type: string } }
@@ -308,6 +308,7 @@ paths:
       parameters:
         - { name: region_code, in: query, schema: { type: string, example: CL-RM } }
         - { name: commune, in: query, description: Necesaria para los métodos con tarifas por zona, schema: { type: string, example: Providencia } }
+        - { name: email, in: query, description: "Con el correo se revisan los límites del cupón por cliente y 'solo primera compra'", schema: { type: string, format: email } }
         - { $ref: "#/components/parameters/CartToken" }
       responses:
         "200":
@@ -325,6 +326,9 @@ paths:
                         type: array
                         items: { type: object, properties: { code: { type: string, example: bank_transfer }, name: { type: string }, description: { type: string } } }
                       subtotal: { type: integer }
+                      discount_total: { type: integer, description: Descuento en productos (promociones y cupón) }
+                      total: { type: integer, description: subtotal - discount_total (sin despacho) }
+                      discounts: { $ref: "#/components/schemas/CartDiscounts" }
   /storefront/v1/checkout:
     post:
       summary: Crea el pedido pendiente de pago. Los precios se recalculan en el servidor
@@ -356,7 +360,7 @@ paths:
                     number: { type: string }
                     apartment: { type: [string, "null"] }
                     region_code: { type: string }
-                    commune: { type: string, description: Si ya se cargaron las comunas oficiales, debe pertenecer a la región }
+                    commune: { type: string, description: "Si ya se cargaron las comunas oficiales, debe pertenecer a la región" }
                     reference: { type: [string, "null"] }
                 document_type: { type: string, enum: [boleta, factura] }
                 billing_rut: { type: string, description: Obligatorio con factura }
@@ -364,6 +368,7 @@ paths:
                 billing_activity: { type: string }
                 notes: { type: string, maxLength: 500 }
                 accepts_terms: { type: boolean }
+                subscribe_newsletter: { type: boolean, description: "Suscribe al boletín (queda por confirmar por correo)" }
                 expected_total: { type: integer, description: Total que vio el cliente. Si no coincide responde 409 price_changed; nunca se usa para cobrar }
       responses:
         "201":
@@ -385,7 +390,7 @@ paths:
                       next: { type: string, enum: [pay, instructions], description: "pay: llevar al cliente a la pasarela con POST /orders/{token}/pay. instructions: mostrar los datos de transferencia" }
         "400": { description: "idempotency_key_required" }
         "404": { description: "cart_not_found" }
-        "409": { description: "price_changed o cart_changed. Incluye `cart` con el resumen actualizado" }
+        "409": { description: "price_changed, cart_changed o coupon_invalid (el cupón dejó de aplicar; el detalle explica por qué). Incluye `cart` con el resumen actualizado" }
         "422": { description: "Validación, cart_empty, payment_unavailable, shipping_unavailable o stock_insufficient" }
   /storefront/v1/orders/{token}:
     get:
@@ -416,7 +421,7 @@ paths:
                           destination: { type: [object, "null"], properties: { commune: { type: [string, "null"] }, region: { type: [string, "null"] } } }
                           estimated_days: { type: [string, "null"] }
                           pickup_address: { type: [string, "null"] }
-        "404": { description: No existe, el enlace no es válido o el despacho fue anulado }
+        "404": { description: "No existe, el enlace no es válido o el despacho fue anulado" }
   /storefront/v1/orders/{token}/pay:
     post:
       summary: "Inicia o reintenta el pago con pasarela. Devuelve el formulario que el navegador debe enviar (POST) a la pasarela"
@@ -630,6 +635,143 @@ paths:
       summary: Elimina una dirección propia
       security: [{ customerToken: [] }]
       responses: { "200": { description: OK } }
+  /storefront/v1/cart/coupon:
+    post:
+      summary: Aplica un cupón al carrito. Si no aplica responde 422 con el motivo en el campo `code`
+      parameters: [{ $ref: "#/components/parameters/CartToken" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [code], properties: { code: { type: string, maxLength: 40 } } } } }
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+        "404": { description: "cart_not_found" }
+        "422": { description: "El cupón no existe, venció, no alcanza el mínimo, ningún producto participa o se agotó" }
+        "429": { description: Más de 10 intentos por minuto }
+    delete:
+      summary: Quita el cupón del carrito
+      parameters: [{ $ref: "#/components/parameters/CartToken" }]
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+  /storefront/v1/newsletter:
+    post:
+      summary: Suscripción al boletín con doble confirmación. Responde siempre lo mismo (no revela si el correo ya estaba)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, consent]
+              properties:
+                email: { type: string, format: email }
+                name: { type: string, maxLength: 120 }
+                consent: { type: boolean, description: Debe ser true }
+                source: { type: string, enum: [footer, checkout, account] }
+      responses:
+        "202": { description: Correo de confirmación en cola (no se reenvía antes de 10 minutos) }
+        "422": { description: Validación }
+        "429": { description: Más de 5 intentos por minuto }
+  /storefront/v1/newsletter/confirm:
+    post:
+      summary: Confirma la suscripción con el token del correo (vence en 7 días)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } } }
+      responses:
+        "200": { description: Confirmada }
+        "422": { description: Enlace inválido o vencido }
+  /storefront/v1/newsletter/unsubscribe:
+    post:
+      summary: Baja con el token firmado del enlace "Darme de baja" (no vence)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } } }
+      responses:
+        "200": { description: Dado de baja }
+        "422": { description: Enlace inválido }
+  /storefront/v1/newsletter/baja/{token}:
+    post:
+      summary: Baja en un clic desde el programa de correo (cabecera List-Unsubscribe-Post, RFC 8058)
+      parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Dado de baja }
+        "404": { description: Enlace inválido }
+  /storefront/v1/newsletter/clic/{token}:
+    get:
+      summary: Cuenta el clic de una campaña y redirige al enlace del botón
+      parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
+      responses:
+        "302": { description: Redirección al destino guardado en la campaña }
+        "404": { description: Enlace inválido }
+  /storefront/v1/blog/posts:
+    get:
+      summary: Artículos publicados (12 por página). Una fecha de publicación futura = programado, no aparece
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: category, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/BlogPostCard" } }
+                  meta: { type: object, properties: { current_page: { type: integer }, last_page: { type: integer }, total: { type: integer } } }
+                  categories: { type: array, items: { type: object, properties: { name: { type: string }, slug: { type: string } } } }
+                  category: { type: [object, "null"] }
+  /storefront/v1/blog/posts/{slug}:
+    get:
+      summary: Artículo publicado. `html` viene de Markdown con el HTML del autor escapado
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - { $ref: "#/components/schemas/BlogPostCard" }
+                      - type: object
+                        properties:
+                          html: { type: string }
+                          updated_at: { type: [string, "null"], format: date-time }
+                          seo: { type: object, properties: { title: { type: string }, description: { type: [string, "null"] } } }
+                          related: { type: array, items: { $ref: "#/components/schemas/BlogPostCard" } }
+        "404": { description: not_found }
+  /storefront/v1/seo/sitemap:
+    get:
+      summary: Rutas visibles para el mapa del sitio (la tienda arma /sitemap.xml con su dominio)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    maxItems: 50000
+                    items: { type: object, properties: { path: { type: string }, lastmod: { type: [string, "null"], format: date-time }, priority: { type: number } } }
+  /storefront/v1/seo/redirects:
+    get:
+      summary: Redirecciones vigentes (máximo 5.000). La tienda las aplica en su middleware
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object, properties: { from: { type: string }, to: { type: string }, code: { type: integer, enum: [301, 302] } } } }
+  /storefront/v1/seo/redirects/hit:
+    post:
+      summary: Suma una visita a la redirección usada
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [path], properties: { path: { type: string } } } } } }
+      responses:
+        "200": { description: OK }
 components:
   securitySchemes:
     customerToken:
@@ -704,6 +846,16 @@ components:
           oneOf:
             - $ref: "#/components/schemas/PublicTheme"
             - type: "null"
+        whatsapp:
+          description: Botón de WhatsApp (Fase 10, enlace wa.me). null = desactivado
+          type: [object, "null"]
+          properties:
+            phone: { type: string, description: Solo dígitos con código de país, example: "56912345678" }
+            message: { type: string }
+            product_message: { type: string, description: "Admite {producto} y {enlace}" }
+            position: { type: string, enum: [right, left] }
+            pages: { type: string, enum: [all, product] }
+            label: { type: string }
     PublicTheme:
       type: object
       properties:
@@ -852,7 +1004,7 @@ components:
                     value: { type: string }
                     label: { type: string }
                     color_hex: { type: [string, "null"] }
-                    count: { type: integer, description: Productos con este valor, ignorando el filtro de su propio atributo }
+                    count: { type: integer, description: "Productos con este valor, ignorando el filtro de su propio atributo" }
                     selected: { type: boolean }
     CategoryCard:
       type: object
@@ -888,14 +1040,18 @@ components:
               quantity: { type: integer }
               unit_price: { type: integer, description: Con IVA }
               compare_at: { type: [integer, "null"] }
-              previous_unit_price: { type: [integer, "null"], description: Precio al agregarlo, si cambió }
+              previous_unit_price: { type: [integer, "null"], description: "Precio al agregarlo, si cambió" }
               line_total: { type: integer }
               tax_amount: { type: integer }
               purchasable: { type: boolean }
               max_quantity: { type: [integer, "null"], description: null = sin límite de stock }
               stock: { type: [object, "null"] }
+              discount: { type: integer, description: Descuento repartido en esta línea }
         count: { type: integer }
         subtotal: { type: integer, description: Solo productos comprables }
+        discount_total: { type: integer }
+        total: { type: integer, description: subtotal - discount_total }
+        discounts: { $ref: "#/components/schemas/CartDiscounts" }
         tax_total: { type: integer }
         warnings: { type: array, items: { type: string } }
         currency: { type: string, example: CLP }
@@ -915,12 +1071,33 @@ components:
         pickup_hours: { type: [string, "null"] }
         pickup_instructions: { type: [string, "null"] }
         zone_name: { type: [string, "null"] }
+        original_amount: { type: integer, description: Precio antes del envío gratis del cupón }
+    CartDiscounts:
+      type: object
+      properties:
+        coupon:
+          type: [object, "null"]
+          properties: { code: { type: string }, name: { type: string }, amount: { type: integer }, free_shipping: { type: boolean } }
+        coupon_error: { type: [string, "null"], description: Por qué el cupón guardado ya no aplica }
+        promotions: { type: array, items: { type: object, properties: { name: { type: string }, amount: { type: integer } } } }
+        free_shipping: { type: boolean }
+    BlogPostCard:
+      type: object
+      properties:
+        title: { type: string }
+        slug: { type: string }
+        excerpt: { type: string }
+        category: { type: [object, "null"], properties: { name: { type: string }, slug: { type: string } } }
+        image: { oneOf: [{ $ref: "#/components/schemas/Image" }, { type: "null" }] }
+        author: { type: [string, "null"] }
+        published_at: { type: string, format: date-time }
+        reading_minutes: { type: integer }
     Shipment:
       type: object
       properties:
         status: { type: string, enum: [preparing, ready_for_pickup, shipped, in_transit, out_for_delivery, failed_attempt, delivered, picked_up, returned, cancelled] }
         status_label: { type: string }
-        carrier: { type: string, description: Courier, Despacho propio o Retiro en tienda }
+        carrier: { type: string, description: "Courier, Despacho propio o Retiro en tienda" }
         tracking_number: { type: [string, "null"] }
         tracking_url: { type: [string, "null"], description: Página de seguimiento del courier }
         follow_token: { type: string, description: "Solo en el pedido: enlace público /seguimiento/{follow_token}" }
@@ -954,7 +1131,7 @@ components:
         payment:
           type: object
           properties:
-            method: { type: string, description: Nombre visible (Webpay, Transferencia bancaria) }
+            method: { type: string, description: "Nombre visible (Webpay, Transferencia bancaria)" }
             method_code: { type: [string, "null"], enum: [webpay_plus, bank_transfer, null] }
             status: { type: [string, "null"], enum: [pending, paid, failed, aborted, expired, cancelled, null], description: Estado del último intento }
             status_label: { type: [string, "null"] }

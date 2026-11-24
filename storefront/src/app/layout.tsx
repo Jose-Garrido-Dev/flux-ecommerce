@@ -9,6 +9,8 @@ import { AnnouncementBar } from "@/components/site/AnnouncementBar";
 import { RevealObserver } from "@/components/motion/RevealObserver";
 import { CartProvider } from "@/components/cart/CartProvider";
 import { CartDrawer } from "@/components/cart/CartDrawer";
+import { WhatsAppButton } from "@/components/marketing/WhatsAppButton";
+import { JsonLd } from "@/components/seo/JsonLd";
 
 /*
  * Bricolage Grotesque (licencia OFL, archivo en src/app/fonts). Fuente variable de peso y ancho.
@@ -62,9 +64,25 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           </main>
           <Footer store={store} menu={menu} links={menus.footer} />
           <CartDrawer />
+          {store?.whatsapp && <WhatsAppButton config={store.whatsapp} />}
         </CartProvider>
+        <JsonLd data={organizationLd(store)} />
         <RevealObserver />
       </body>
     </html>
   );
+}
+
+/** Datos estructurados de la tienda (Organization) para buscadores. */
+function organizationLd(store: Awaited<ReturnType<typeof getStore>>) {
+  const site = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  return {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: store?.name ?? "Tienda",
+    url: site,
+    ...(store?.contact.email ? { email: store.contact.email } : {}),
+    ...(store?.contact.phone ? { telephone: store.contact.phone } : {}),
+    sameAs: Object.values(store?.social ?? {}),
+  };
 }

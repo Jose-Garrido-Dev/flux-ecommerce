@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { CategoryNode, MenuLink, PublicStore } from "@/lib/types";
 import { CmsLink } from "@/components/cms/CmsLink";
 import { Container } from "@/components/ui/Container";
+import { NewsletterForm } from "@/components/marketing/NewsletterForm";
 
 const SOCIAL_LABEL = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok" } as const;
 
@@ -17,6 +18,9 @@ export function Footer({ store, menu, links = [] }: { store: PublicStore | null;
         <div>
           <p className="font-display text-5xl leading-none sm:text-6xl">{name}</p>
           {store?.tagline && <p className="mt-5 max-w-sm text-ink-muted">{store.tagline}</p>}
+          <div className="mt-8">
+            <NewsletterForm />
+          </div>
         </div>
         {menu.length > 0 && (
           <nav aria-label="Categorías">
@@ -33,10 +37,13 @@ export function Footer({ store, menu, links = [] }: { store: PublicStore | null;
             </ul>
           </nav>
         )}
-        {links.length > 0 && (
+        {(
           <nav aria-label="Información">
             <p className="text-sm font-semibold text-ink-muted">Información</p>
             <ul className="mt-5 space-y-3">
+              <li>
+                <Link href="/blog" className="hover:underline underline-offset-4">Blog</Link>
+              </li>
               {links.map((l, i) => (
                 <li key={i}>
                   <CmsLink href={l.href} className="hover:underline underline-offset-4">{l.label}</CmsLink>

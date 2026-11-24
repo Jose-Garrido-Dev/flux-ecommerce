@@ -69,8 +69,11 @@ export function CartDrawer() {
             <div className="border-t border-border px-6 py-5">
               <div className="flex items-baseline justify-between">
                 <span className="text-sm text-muted">Subtotal (IVA incluido)</span>
-                <span className="font-display text-3xl tabular-nums">{formatMoney(cart?.subtotal ?? 0)}</span>
+                <span className="font-display text-3xl tabular-nums">{formatMoney(cart?.total ?? cart?.subtotal ?? 0)}</span>
               </div>
+              {(cart?.discount_total ?? 0) > 0 && (
+                <p className="mt-1 text-xs font-medium text-accent tabular-nums">Incluye {formatMoney(cart?.discount_total ?? 0)} de descuento.</p>
+              )}
               <p className="mt-1 text-xs text-muted">El despacho se calcula en el siguiente paso.</p>
               <div className="mt-5 grid gap-3">
                 {blocked ? (
