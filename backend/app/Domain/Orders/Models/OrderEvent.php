@@ -2,6 +2,7 @@
 
 namespace App\Domain\Orders\Models;
 
+use App\Domain\Shipping\Models\Shipment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
@@ -19,6 +20,11 @@ class OrderEvent extends Model
         'payment_aborted' => 'Pago no completado',
         'refunded' => 'Reembolso',
         'cancelled' => 'Pedido cancelado',
+        'shipment_created' => 'Despacho creado',
+        'shipment_status' => 'Estado del despacho',
+        'incident_opened' => 'Incidencia abierta',
+        'incident_resolved' => 'Incidencia resuelta',
+        'completed' => 'Pedido completado',
         'note' => 'Nota',
         'email_sent' => 'Correo enviado',
     ];
@@ -43,6 +49,10 @@ class OrderEvent extends Model
 
     public function label(): string
     {
+        if ($this->type === 'shipment_status' && $this->to_status) {
+            return 'Despacho: '.mb_strtolower(Shipment::STATUSES[$this->to_status] ?? $this->to_status);
+        }
+
         return self::TYPES[$this->type] ?? $this->type;
     }
 }

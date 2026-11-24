@@ -14,8 +14,12 @@ use App\Domain\Inventory\Models\StockReservation;
 use App\Domain\Inventory\Models\StockTransfer;
 use App\Domain\Inventory\Models\Warehouse;
 use App\Domain\Orders\Models\Order;
+use App\Domain\Shipping\Models\Courier;
 use App\Domain\Shipping\Models\Region;
+use App\Domain\Shipping\Models\Shipment;
+use App\Domain\Shipping\Models\ShippingIncident;
 use App\Domain\Shipping\Models\ShippingMethod;
+use App\Domain\Shipping\Models\ShippingZone;
 use App\Domain\System\Models\AuditLog;
 use App\Domain\System\Models\ModuleStatus;
 use App\Domain\System\Services\AuditLogger;
@@ -89,6 +93,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Order::class, OrderPolicy::class);
         Gate::policy(Customer::class, CustomerPolicy::class);
         Gate::policy(ShippingMethod::class, ShippingMethodPolicy::class);
+        Gate::policy(ShippingZone::class, ShippingMethodPolicy::class);
+        Gate::policy(Courier::class, ShippingMethodPolicy::class);
+        Gate::policy(Shipment::class, ShippingMethodPolicy::class);
+        Gate::policy(ShippingIncident::class, ShippingMethodPolicy::class);
 
         // El superadministrador técnico tiene todos los permisos
         Gate::before(fn ($user) => $user->hasRole('super-admin') ? true : null);

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Storefront\V1\CheckoutController;
 use App\Http\Controllers\Api\Storefront\V1\GeoController;
 use App\Http\Controllers\Api\Storefront\V1\MeController;
 use App\Http\Controllers\Api\Storefront\V1\OrderTrackingController;
+use App\Http\Controllers\Api\Storefront\V1\ShipmentTrackingController;
 use App\Http\Controllers\Api\Storefront\V1\StoreController;
 use App\Http\Controllers\Webhooks\PaymentReturnController;
 use App\Http\Middleware\AuthenticateCustomer;
@@ -46,6 +47,7 @@ Route::prefix('storefront/v1')->middleware('throttle:storefront')->group(functio
     Route::post('/checkout', [CheckoutController::class, 'store']);
     Route::get('/orders/{token}', [OrderTrackingController::class, 'show']);
     Route::post('/orders/{token}/pay', [OrderTrackingController::class, 'pay']);
+    Route::get('/shipments/{token}', [ShipmentTrackingController::class, 'show']);
 
     Route::prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);

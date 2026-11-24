@@ -13,7 +13,8 @@ use App\Domain\Orders\Models\Order;
 use App\Domain\Payments\Services\PaymentProcessor;
 use App\Domain\Shipping\Models\Region;
 use App\Domain\Shipping\Models\ShippingMethod;
-use App\Domain\Shipping\Services\ShippingQuoter;
+use App\Domain\Shipping\Services\RateEngine;
+use App\Domain\Shipping\Services\ShippingPackage;
 use App\Domain\System\Services\AuditLogger;
 use App\Domain\System\Services\SettingsRepository;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -32,7 +33,7 @@ class PlaceOrder
     public function __construct(
         private readonly CartService $carts,
         private readonly InventoryService $inventory,
-        private readonly ShippingQuoter $shipping,
+        private readonly RateEngine $shipping,
         private readonly PaymentSettings $payments,
     ) {}
 
@@ -64,12 +65,18 @@ class PlaceOrder
         $region = Region::query()->where('code', $input['address']['region_code'] ?? '')->where('is_enabled', true)->first();
         $method = ShippingMethod::query()->active()->where('code', $input['shipping_method'] ?? '')->first();
         $needsAddress = $method?->type !== 'pickup';
-        if (! $method || ($needsAddress && (! $region || ! $method->servesRegion($region->id)))) {
+        if (! $method || ($needsAddress && ! $region)) {
             throw new CheckoutException('shipping_unavailable', 'El método de envío elegido no está disponible para tu dirección.', 422);
+        }
+        // Mismo cálculo que vio el cliente en el checkout: zona, peso (real o volumétrico) y restricciones de los productos
+        $commune = $needsAddress ? ($input['address']['commune'] ?? null) : null;
+        $result = $this->shipping->evaluate($method, $region?->id, $commune, array_sum(array_column($lines, 'line_total')), ShippingPackage::fromLines($lines));
+        if (! $result['available']) {
+            throw new CheckoutException('shipping_unavailable', 'El método de envío elegido no está disponible para tu dirección o tus productos.', 422);
         }
 
         $subtotal = array_sum(array_column($lines, 'line_total'));
-        $ship = $this->shipping->present($method, $subtotal);
+        $ship = $result['option'];
         $itemsTax = array_sum(array_column($lines, 'tax_amount'));
         $grandTotal = $subtotal + $ship['amount'];
 
@@ -133,7 +140,9 @@ class PlaceOrder
 
                 $order->shippingLine()->create([
                     'method_id' => $method->id, 'method_code' => $method->code, 'method_name' => $method->name, 'type' => $method->type,
-                    'amount' => $ship['amount'], 'tax_amount' => $ship['tax_amount'], 'estimated_days' => $method->estimated_days,
+                    'amount' => $ship['amount'], 'tax_amount' => $ship['tax_amount'], 'estimated_days' => $ship['estimated_days'],
+                    'carrier_code' => $ship['carrier_code'], 'zone_id' => $ship['zone_id'], 'zone_name' => $ship['zone_name'],
+                    'chargeable_weight_g' => $ship['chargeable_weight_g'], 'pickup_address' => $ship['pickup_address'],
                 ]);
                 $order->payments()->create([
                     'method_code' => $paymentMethod, 'amount' => $grandTotal, 'expires_at' => now()->addMinutes($minutes),

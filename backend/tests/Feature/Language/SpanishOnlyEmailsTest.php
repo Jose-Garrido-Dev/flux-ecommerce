@@ -10,11 +10,14 @@ use App\Domain\Orders\Mail\PaymentConfirmedMail;
 use App\Domain\Orders\Mail\RefundMail;
 use App\Domain\Orders\Models\Order;
 use App\Domain\Payments\Models\Refund;
+use App\Domain\Shipping\Mail\ShipmentMail;
+use App\Domain\Shipping\Models\Shipment;
 use App\Domain\System\Services\SettingsRepository;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /** Los correos que envía el sistema (plantilla de Laravel) también van en español. */
@@ -44,11 +47,20 @@ class SpanishOnlyEmailsTest extends TestCase
         $order->shippingLine()->create(['method_code' => 'retiro', 'method_name' => 'Retiro en tienda', 'type' => 'pickup', 'amount' => 0, 'tax_amount' => 0]);
         $customer = Customer::query()->create(['first_name' => 'Ana', 'last_name' => 'Pérez', 'email' => 'ana@correo.cl', 'password' => 'clave1234']);
 
+        $shipment = Shipment::query()->create([
+            'uuid' => (string) Str::uuid(), 'order_id' => $order->id, 'tracking_token_hash' => str_repeat('b', 64),
+            'carrier_name' => 'Starken', 'tracking_number' => 'ABC123', 'tracking_url' => 'https://courier.example/ABC123', 'status' => 'shipped',
+        ]);
+        $shipment->items()->create(['order_item_id' => $order->items()->first()->id, 'quantity' => 1]);
         $mails = [
             new OrderPlacedMail($order),
             new PaymentConfirmedMail($order),
             new NewOrderNotificationMail($order),
             new RefundMail($order, new Refund(['amount' => 1000, 'reason' => 'Demora'])),
+            new ShipmentMail($order, $shipment, 'shipped'),
+            new ShipmentMail($order, $shipment, 'ready_for_pickup'),
+            new ShipmentMail($order, $shipment, 'delivered'),
+            new ShipmentMail($order, $shipment, 'picked_up'),
             new CustomerMail($customer, 'verify', 'https://tienda.test/cuenta/verificar'),
             new CustomerMail($customer, 'reset', 'https://tienda.test/cuenta/restablecer'),
         ];

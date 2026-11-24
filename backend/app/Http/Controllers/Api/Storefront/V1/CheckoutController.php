@@ -10,7 +10,8 @@ use App\Domain\Orders\Services\PaymentSettings;
 use App\Domain\Orders\Services\PlaceOrder;
 use App\Domain\Shipping\Models\Region;
 use App\Domain\Shipping\Models\ShippingMethod;
-use App\Domain\Shipping\Services\ShippingQuoter;
+use App\Domain\Shipping\Services\RateEngine;
+use App\Domain\Shipping\Services\ShippingPackage;
 use App\Support\Rut;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -22,22 +23,22 @@ class CheckoutController extends StorefrontController
 {
     public function __construct(
         private readonly CartService $carts,
-        private readonly ShippingQuoter $shipping,
+        private readonly RateEngine $shipping,
         private readonly PaymentSettings $payments,
     ) {}
 
     /** Métodos de envío para la región elegida y medios de pago disponibles, con el total actualizado. */
     public function options(Request $request): JsonResponse
     {
-        $data = $request->validate(['region_code' => ['nullable', 'string', 'max:8']]);
+        $data = $request->validate(['region_code' => ['nullable', 'string', 'max:8'], 'commune' => ['nullable', 'string', 'max:80']]);
         $cart = $this->cart($request, $this->carts);
         $summary = $cart ? $this->carts->summary($cart) : null;
         $regionId = isset($data['region_code']) ? Region::query()->where('code', $data['region_code'])->value('id') : null;
         $subtotal = $summary['subtotal'] ?? 0;
 
         return response()->json(['data' => [
-            'shipping_methods' => $this->shipping->quote($regionId, $subtotal)
-                ->map(fn ($m) => array_diff_key($m, ['method_id' => 1, 'tax_amount' => 1]))->all(),
+            'shipping_methods' => $this->shipping->quote($regionId, $data['commune'] ?? null, $subtotal, ShippingPackage::fromLines(array_filter($summary['items'] ?? [], fn ($l) => $l['purchasable'])))
+                ->map(fn ($m) => array_diff_key($m, array_flip(['method_id', 'tax_amount', 'zone_id', 'chargeable_weight_g'])))->all(),
             'payment_methods' => $this->payments->methods(),
             'subtotal' => $subtotal,
         ]]);

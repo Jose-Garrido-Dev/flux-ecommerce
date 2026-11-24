@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Flux Storefront API
-  version: 0.7.0
+  version: 0.8.0
   description: >
     Contrato entre el backend Laravel y el storefront Next.js.
     Todo endpoint nuevo se agrega aquí antes de implementarse.
@@ -237,9 +237,10 @@ paths:
         "404": { description: "cart_not_found" }
   /storefront/v1/checkout/options:
     get:
-      summary: Métodos de despacho para la región y medios de pago activos
+      summary: Métodos de despacho para la región, la comuna y el peso del carrito, y medios de pago activos
       parameters:
         - { name: region_code, in: query, schema: { type: string, example: CL-RM } }
+        - { name: commune, in: query, description: Necesaria para los métodos con tarifas por zona, schema: { type: string, example: Providencia } }
         - { $ref: "#/components/parameters/CartToken" }
       responses:
         "200":
@@ -326,6 +327,29 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: "#/components/schemas/Order" } } } } } }
         "404": { description: No existe }
+  /storefront/v1/shipments/{token}:
+    get:
+      summary: Seguimiento público de un despacho con el enlace del correo. Sin nombres, correos, teléfonos ni dirección (solo comuna y región)
+      parameters: [{ name: token, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - { $ref: "#/components/schemas/Shipment" }
+                      - type: object
+                        properties:
+                          order_number: { type: integer }
+                          delivery: { type: string, enum: [pickup, delivery] }
+                          destination: { type: [object, "null"], properties: { commune: { type: [string, "null"] }, region: { type: [string, "null"] } } }
+                          estimated_days: { type: [string, "null"] }
+                          pickup_address: { type: [string, "null"] }
+        "404": { description: No existe, el enlace no es válido o el despacho fue anulado }
   /storefront/v1/orders/{token}/pay:
     post:
       summary: "Inicia o reintenta el pago con pasarela. Devuelve el formulario que el navegador debe enviar (POST) a la pasarela"
@@ -686,12 +710,32 @@ components:
       properties:
         code: { type: string }
         name: { type: string }
-        type: { type: string, enum: [flat, pickup] }
+        type: { type: string, enum: [flat, table, pickup] }
         description: { type: [string, "null"] }
         amount: { type: integer, description: Con IVA; 0 si aplica despacho gratis }
         free_over: { type: [integer, "null"] }
         estimated_days: { type: [string, "null"] }
+        carrier_code: { type: [string, "null"], enum: [chilexpress, starken, blue_express, null] }
+        carrier_name: { type: [string, "null"] }
         pickup_address: { type: [string, "null"] }
+        pickup_hours: { type: [string, "null"] }
+        pickup_instructions: { type: [string, "null"] }
+        zone_name: { type: [string, "null"] }
+    Shipment:
+      type: object
+      properties:
+        status: { type: string, enum: [preparing, ready_for_pickup, shipped, in_transit, out_for_delivery, failed_attempt, delivered, picked_up, returned, cancelled] }
+        status_label: { type: string }
+        carrier: { type: string, description: Courier, Despacho propio o Retiro en tienda }
+        tracking_number: { type: [string, "null"] }
+        tracking_url: { type: [string, "null"], description: Página de seguimiento del courier }
+        follow_token: { type: string, description: "Solo en el pedido: enlace público /seguimiento/{follow_token}" }
+        shipped_at: { type: [string, "null"], format: date-time }
+        delivered_at: { type: [string, "null"], format: date-time }
+        items: { type: array, items: { type: object, properties: { name: { type: string }, variant_label: { type: [string, "null"] }, quantity: { type: integer } } } }
+        events:
+          type: array
+          items: { type: object, properties: { status: { type: string }, label: { type: string }, description: { type: [string, "null"] }, location: { type: [string, "null"] }, at: { type: string, format: date-time } } }
     Order:
       type: object
       properties:
@@ -702,6 +746,8 @@ components:
         status_label: { type: string }
         payment_status: { type: string, enum: [pending, paid, expired, cancelled, refunded] }
         payment_status_label: { type: string }
+        fulfillment_status: { type: string, enum: [unfulfilled, preparing, partially_shipped, ready_for_pickup, shipped, delivered, picked_up] }
+        fulfillment_status_label: { type: string }
         first_name: { type: string }
         email: { type: [string, "null"], description: Solo para el dueño con sesión }
         items: { type: array, items: { type: object } }
@@ -709,7 +755,8 @@ components:
         shipping_total: { type: integer }
         tax_total: { type: integer }
         grand_total: { type: integer }
-        shipping: { type: object, description: "method, type, estimated_days, address (por token: solo commune y region)" }
+        shipping: { type: object, description: "method, type, estimated_days, pickup_address, address (por token: solo commune y region)" }
+        shipments: { type: array, description: Despachos no anulados, items: { $ref: "#/components/schemas/Shipment" } }
         payment:
           type: object
           properties:

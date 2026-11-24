@@ -19,6 +19,8 @@ final class Labels
         'InventoryLevel' => 'Existencia', 'StockMovement' => 'Movimiento de inventario', 'StockTransfer' => 'Transferencia',
         'StockReservation' => 'Reserva de stock', 'Order' => 'Pedido', 'Customer' => 'Cliente', 'ShippingMethod' => 'Método de envío',
         'Payment' => 'Pago', 'Address' => 'Dirección', 'PaymentGateway' => 'Pasarela de pago', 'Refund' => 'Reembolso',
+        'ShippingZone' => 'Zona de envío', 'ShippingRate' => 'Tarifa de envío', 'Courier' => 'Courier', 'Shipment' => 'Despacho',
+        'ShippingIncident' => 'Incidencia de despacho',
     ];
 
     public const VERBS = [

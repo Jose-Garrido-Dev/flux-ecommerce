@@ -23,6 +23,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 use UnitEnum;
 
 /** Inventario → Movimientos (módulo 6.2). Historial inmutable: se corrige con "Revertir". */
@@ -113,7 +114,7 @@ class StockMovementResource extends Resource
             'transfer' => 'Transferencia #'.$movement->reference_id,
             'movement' => 'Revierte el movimiento #'.$movement->reference_id,
             'cart' => 'Carrito',
-            'order' => 'Pedido '.(self::$orderNumbers[$movement->reference_id] ??= Order::query()->where('uuid', $movement->reference_id)->value('number') ?? '(no encontrado)'),
+            'order' => 'Pedido '.(self::$orderNumbers[$movement->reference_id] ??= (Str::isUuid((string) $movement->reference_id) ? Order::query()->where('uuid', $movement->reference_id)->value('number') : $movement->reference_id) ?? '(no encontrado)'),
             'import' => 'Importación',
             'document' => $movement->reference_id,
             default => $movement->reference_id,

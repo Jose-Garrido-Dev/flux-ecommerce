@@ -74,12 +74,18 @@ export function CheckoutForm({
       }
     : address;
   const regionCode = effectiveAddress.region_code;
+  const commune = effectiveAddress.commune.trim();
 
-  // Los métodos de despacho dependen de la región (y del subtotal, que el servidor conoce)
+  // Los métodos de despacho dependen de la región, la comuna, el peso y el subtotal (el servidor los conoce)
   useEffect(() => {
     let cancelled = false;
     setLoadingOptions(true);
-    bff<CheckoutOptions>(`checkout/options${regionCode ? `?region_code=${encodeURIComponent(regionCode)}` : ""}`).then((res) => {
+    const params = new URLSearchParams();
+    if (regionCode) params.set("region_code", regionCode);
+    if (regionCode && commune) params.set("commune", commune);
+    const query = params.toString();
+    // Espera un momento mientras se escribe la comuna a mano
+    const timer = setTimeout(() => bff<CheckoutOptions>(`checkout/options${query ? `?${query}` : ""}`).then((res) => {
       if (cancelled) return;
       setLoadingOptions(false);
       if (!res.ok || !res.data) {
@@ -90,11 +96,12 @@ export function CheckoutForm({
       setOptions(data);
       setShippingCode((current) => (data.shipping_methods.some((m) => m.code === current) ? current : (data.shipping_methods.find((m) => m.type !== "pickup") ?? data.shipping_methods[0])?.code ?? ""));
       setPaymentCode((current) => (data.payment_methods.some((m) => m.code === current) ? current : data.payment_methods[0]?.code ?? ""));
-    });
+    }), 300);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, [regionCode, cart.subtotal]);
+  }, [regionCode, commune, cart.subtotal, cart.count]);
 
   const shipping = options?.shipping_methods.find((m) => m.code === shippingCode);
   const payment = options?.payment_methods.find((m) => m.code === paymentCode);
@@ -218,7 +225,13 @@ export function CheckoutForm({
           {loadingOptions && !options ? (
             <p className="text-sm text-muted">Cargando opciones de despacho…</p>
           ) : options && options.shipping_methods.length === 0 ? (
-            <Alert tone="info">{regionCode ? `Por ahora no despachamos a ${regionName ?? "esta región"}.` : "Elige la región de entrega para ver las opciones de despacho."}</Alert>
+            <Alert tone="info">
+              {!regionCode
+                ? "Elige la región de entrega para ver las opciones de despacho."
+                : !commune
+                  ? "Elige la comuna para ver las opciones de despacho."
+                  : `Por ahora no despachamos a ${commune}, ${regionName ?? "esta región"}.`}
+            </Alert>
           ) : (
             <fieldset>
               <legend className="sr-only">Método de despacho</legend>
@@ -231,9 +244,11 @@ export function CheckoutForm({
                         {m.name}
                         <span className="tabular-nums">{m.amount === 0 ? "Gratis" : formatMoney(m.amount)}</span>
                       </span>
+                      {m.carrier_name && <span className="mt-1 block text-sm text-muted">Con {m.carrier_name}</span>}
                       {m.description && <span className="mt-1 block text-sm text-muted">{m.description}</span>}
                       {m.estimated_days && <span className="mt-1 block text-sm text-muted">Plazo estimado: {m.estimated_days}</span>}
                       {m.pickup_address && <span className="mt-1 block text-sm text-muted">Retiras en: {m.pickup_address}</span>}
+                      {m.pickup_hours && <span className="mt-1 block text-sm text-muted">Horario: {m.pickup_hours}</span>}
                       {m.free_over !== null && m.amount > 0 && <span className="mt-1 block text-xs text-muted">Gratis en compras desde {formatMoney(m.free_over)}.</span>}
                     </span>
                   </label>
