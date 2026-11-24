@@ -13,7 +13,10 @@ use App\Domain\Inventory\Models\StockMovement;
 use App\Domain\Inventory\Models\StockReservation;
 use App\Domain\Inventory\Models\StockTransfer;
 use App\Domain\Inventory\Models\Warehouse;
+use App\Domain\Notifications\Models\EmailLog;
+use App\Domain\Notifications\Models\EmailTemplate;
 use App\Domain\Orders\Models\Order;
+use App\Domain\Returns\Models\ReturnRequest;
 use App\Domain\Shipping\Models\Courier;
 use App\Domain\Shipping\Models\Region;
 use App\Domain\Shipping\Models\Shipment;
@@ -31,11 +34,13 @@ use App\Policies\BrandPolicy;
 use App\Policies\CatalogImportPolicy;
 use App\Policies\CategoryPolicy;
 use App\Policies\CustomerPolicy;
+use App\Policies\EmailPolicy;
 use App\Policies\InventoryPolicy;
 use App\Policies\ModuleStatusPolicy;
 use App\Policies\OrderPolicy;
 use App\Policies\ProductPolicy;
 use App\Policies\RegionPolicy;
+use App\Policies\ReturnPolicy;
 use App\Policies\ShippingMethodPolicy;
 use App\Policies\StockMovementPolicy;
 use App\Policies\UserPolicy;
@@ -97,6 +102,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Courier::class, ShippingMethodPolicy::class);
         Gate::policy(Shipment::class, ShippingMethodPolicy::class);
         Gate::policy(ShippingIncident::class, ShippingMethodPolicy::class);
+        Gate::policy(ReturnRequest::class, ReturnPolicy::class);
+        Gate::policy(EmailTemplate::class, EmailPolicy::class);
+        Gate::policy(EmailLog::class, EmailPolicy::class);
 
         // El superadministrador técnico tiene todos los permisos
         Gate::before(fn ($user) => $user->hasRole('super-admin') ? true : null);

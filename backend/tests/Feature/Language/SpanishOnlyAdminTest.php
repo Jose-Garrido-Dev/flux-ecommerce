@@ -10,10 +10,12 @@ use App\Domain\Customers\Models\Customer;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Models\Warehouse;
 use App\Domain\Inventory\Services\InventoryService;
+use App\Domain\Notifications\Models\EmailTemplate;
 use App\Domain\Orders\Services\OrderPayments;
 use App\Domain\Orders\Services\PlaceOrder;
 use App\Domain\Payments\Models\PaymentGateway;
 use App\Domain\Payments\Services\RefundService;
+use App\Domain\Returns\Services\ReturnService;
 use App\Domain\Shipping\Models\Region;
 use App\Domain\Shipping\Models\ShippingMethod;
 use App\Domain\Shipping\Models\ShippingZone;
@@ -86,8 +88,13 @@ class SpanishOnlyAdminTest extends TestCase
         $webpay->credentials = ['commerce_code' => '597055555532', 'api_key' => 'x'];
         $webpay->save();
         $webpay->update(['enabled' => true, 'verified_at' => now(), 'verified_environment' => 'integration', 'verified_fingerprint' => $webpay->fingerprint()]);
+        // Devolución con sus productos y una plantilla de correo
+        $returns = app(ReturnService::class);
+        $return = $returns->request($order->fresh(), [$order->items->first()->id => 1], 'return', 'defective', 'Llegó con una mancha', actor: 'user');
+        $returns->approve($return, 'Envíala a la tienda.');
+        EmailTemplate::syncDefaults();
         $records = [
-            'orders' => $order, 'customers' => $customer, 'shipments' => $shipment,
+            'orders' => $order, 'returns' => $return, 'email-templates' => EmailTemplate::query()->where('key', 'order_placed')->first(), 'customers' => $customer, 'shipments' => $shipment,
             'stock-transfers' => $transfer,
             'products' => $product, 'categories' => $category, 'brands' => $brand,
             'attributes' => Attribute::query()->first(), 'users' => $admin, 'regions' => Region::query()->first(),

@@ -23,7 +23,7 @@ export default async function AccountOrderPage({ params }: { params: Promise<{ u
       <p className="label mt-8">Realizado el {formatDate(order.placed_at)}</p>
       <h1 className="mt-3 font-display text-5xl sm:text-7xl">Pedido {order.number}</h1>
       <div className="mt-10">
-        <OrderView order={order} />
+        <OrderView order={order} apiBase={`me/orders/${uuid}`} />
       </div>
     </Container>
   );

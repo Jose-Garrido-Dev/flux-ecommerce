@@ -63,7 +63,7 @@ export default async function OrderTrackingPage({
         </div>
       )}
       <div className="mt-10">
-        <OrderView order={order} orderToken={token} />
+        <OrderView order={order} orderToken={token} apiBase={`orders/${token}`} />
       </div>
       <div className="mt-12">
         <ButtonLink href="/catalogo" variant="secondary">

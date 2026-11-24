@@ -7,6 +7,9 @@ use App\Domain\Orders\Models\OrderEvent;
 use App\Domain\Orders\Models\OrderItem;
 use App\Domain\Orders\Models\Payment;
 use App\Domain\Payments\Gateways\WebpayPlus\WebpayPlusGateway;
+use App\Domain\Returns\Models\ReturnRequest;
+use App\Domain\Returns\Services\ReturnService;
+use App\Domain\Returns\Services\ReturnSettings;
 use App\Domain\Shipping\Models\Shipment;
 use App\Domain\Shipping\Services\ShipmentService;
 use App\Domain\Shipping\Services\ShipmentTokens;
@@ -14,12 +17,19 @@ use App\Domain\Shipping\Services\ShipmentTokens;
 /** Forma pública del pedido para la tienda. Nunca incluye costos ni datos internos. */
 class OrderPresenter
 {
-    public function __construct(private readonly PaymentSettings $payments, private readonly ShipmentService $shipments) {}
+    public function __construct(
+        private readonly PaymentSettings $payments,
+        private readonly ShipmentService $shipments,
+        private readonly ReturnService $returns,
+        private readonly ReturnSettings $returnSettings,
+    ) {}
 
     /** @param bool $full con sesión del dueño: dirección completa. Por token: solo comuna y región. */
     public function present(Order $order, bool $full): array
     {
-        $order->loadMissing(['items', 'shippingLine', 'events', 'latestPayment', 'shipments.items.orderItem', 'shipments.events']);
+        $order->loadMissing(['items', 'shippingLine', 'events', 'latestPayment', 'shipments.items.orderItem', 'shipments.events', 'returns.items.orderItem']);
+        $returnable = $this->returns->returnable($order);
+        $blocker = $this->returns->customerBlocker($order);
         $address = $order->shipping_address;
         $payment = $order->latestPayment;
 
@@ -35,7 +45,10 @@ class OrderPresenter
             'fulfillment_status_label' => Order::FULFILLMENT_STATUSES[$order->fulfillment_status] ?? $order->fulfillment_status,
             'first_name' => $order->first_name,
             'email' => $full ? $order->email : null,
+            'can_cancel' => $order->isCancellable(),
             'items' => $order->items->map(fn (OrderItem $i) => [
+                'id' => $i->id,
+                'returnable_quantity' => $returnable[$i->id] ?? 0,
                 'name' => $i->product_name,
                 'variant_label' => $i->variant_label,
                 'sku' => $i->sku,
@@ -77,11 +90,46 @@ class OrderPresenter
                 'refunded_amount' => $order->refunded_total,
             ],
             'shipments' => $order->shipments->where('status', '!=', 'cancelled')->map(fn (Shipment $s) => $this->shipment($s))->values()->all(),
+            'returns' => $order->returns->sortByDesc('id')->map(fn (ReturnRequest $r) => $this->returnRequest($r))->values()->all(),
+            'return_policy' => [
+                'can_request' => $blocker === null,
+                'blocked_reason' => $blocker,
+                'deadline' => $this->returns->deadline($order)?->toIso8601String(),
+                'days' => $this->returnSettings->days(),
+                'allow_exchange' => $this->returnSettings->allowExchange(),
+                'policy' => $this->returnSettings->policy(),
+                'reasons' => ReturnRequest::REASONS,
+            ],
             'document_type' => $order->document_type,
             'events' => $order->events->where('visible_to_customer', true)->map(fn (OrderEvent $e) => [
                 'type' => $e->type,
                 'label' => $e->label(),
                 'at' => $e->created_at?->toIso8601String(),
+            ])->values()->all(),
+        ];
+    }
+
+    /** Devolución visible para el cliente: sin notas internas ni responsable. */
+    public function returnRequest(ReturnRequest $r): array
+    {
+        return [
+            'uuid' => $r->uuid,
+            'label' => $r->label(),
+            'type' => $r->type,
+            'type_label' => ReturnRequest::TYPES[$r->type] ?? $r->type,
+            'reason_label' => ReturnRequest::REASONS[$r->reason] ?? $r->reason,
+            'status' => $r->status,
+            'status_label' => $r->statusLabel(),
+            'instructions' => in_array($r->status, ['approved'], true) ? $r->instructions : null,
+            'rejection_reason' => $r->status === 'rejected' ? $r->rejection_reason : null,
+            'resolution' => in_array($r->status, ['processed', 'closed'], true) ? $r->resolution : null,
+            'refund_amount' => in_array($r->status, ['processed', 'closed'], true) ? $r->refund_amount : null,
+            'can_cancel' => $r->canMoveTo('cancelled'),
+            'created_at' => $r->created_at?->toIso8601String(),
+            'items' => $r->items->map(fn ($i) => [
+                'name' => $i->orderItem?->product_name,
+                'variant_label' => $i->orderItem?->variant_label,
+                'quantity' => $i->quantity,
             ])->values()->all(),
         ];
     }

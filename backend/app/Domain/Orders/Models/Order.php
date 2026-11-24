@@ -3,7 +3,9 @@
 namespace App\Domain\Orders\Models;
 
 use App\Domain\Customers\Models\Customer;
+use App\Domain\Notifications\Models\EmailLog;
 use App\Domain\Payments\Models\Refund;
+use App\Domain\Returns\Models\ReturnRequest;
 use App\Domain\Shipping\Models\Shipment;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -108,6 +110,16 @@ class Order extends Model
     public function fullName(): string
     {
         return trim($this->first_name.' '.$this->last_name);
+    }
+
+    public function emailLogs(): HasMany
+    {
+        return $this->hasMany(EmailLog::class)->latest('id');
+    }
+
+    public function returns(): HasMany
+    {
+        return $this->hasMany(ReturnRequest::class);
     }
 
     public function isCancellable(): bool

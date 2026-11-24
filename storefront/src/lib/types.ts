@@ -190,7 +190,18 @@ export type OrderDetail = {
   fulfillment_status_label: string;
   first_name: string;
   email: string | null;
-  items: { name: string; variant_label: string | null; sku: string; image: { path: string; alt: string } | null; quantity: number; unit_price: number; line_total: number }[];
+  can_cancel: boolean;
+  items: {
+    id: number;
+    returnable_quantity: number;
+    name: string;
+    variant_label: string | null;
+    sku: string;
+    image: { path: string; alt: string } | null;
+    quantity: number;
+    unit_price: number;
+    line_total: number;
+  }[];
   subtotal: number;
   shipping_total: number;
   tax_total: number;
@@ -213,6 +224,16 @@ export type OrderDetail = {
     refunded_amount: number;
   };
   shipments: Shipment[];
+  returns: ReturnSummary[];
+  return_policy: {
+    can_request: boolean;
+    blocked_reason: string | null;
+    deadline: string | null;
+    days: number;
+    allow_exchange: boolean;
+    policy: string | null;
+    reasons: Record<string, string>;
+  };
   document_type: string | null;
   events: { type: string; label: string; at: string | null }[];
 };
@@ -276,4 +297,21 @@ export type CustomerAddress = {
   commune: string;
   reference: string | null;
   is_default: boolean;
+};
+
+export type ReturnSummary = {
+  uuid: string;
+  label: string;
+  type: "return" | "exchange";
+  type_label: string;
+  reason_label: string;
+  status: string;
+  status_label: string;
+  instructions: string | null;
+  rejection_reason: string | null;
+  resolution: string | null;
+  refund_amount: number | null;
+  can_cancel: boolean;
+  created_at: string | null;
+  items: { name: string | null; variant_label: string | null; quantity: number }[];
 };

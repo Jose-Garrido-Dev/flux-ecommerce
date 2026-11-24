@@ -1,6 +1,6 @@
 # Pedidos
 
-**Para qué sirve:** ver los pedidos de la tienda, confirmar las transferencias recibidas, revisar los pagos con Webpay, despachar, reembolsar y cancelar los que no se pagarán.
+**Para qué sirve:** ver los pedidos de la tienda, confirmar las transferencias recibidas, revisar los pagos con Webpay, despachar, reembolsar, registrar devoluciones y notas, y cancelar los que no se pagarán.
 
 ## Estados
 | Estado del pedido | Significado |
@@ -54,7 +54,30 @@ Para pedidos pagados. Pulsa **Reembolsar**, escribe el monto y el motivo.
 - El cliente recibe un correo con el monto reembolsado.
 
 ## Cancelar
-Solo los pedidos pendientes de pago. Se libera el stock reservado y el cliente ve el pedido como cancelado. Un pedido pagado se resuelve con un reembolso.
+Solo los pedidos pendientes de pago. Escribe el motivo: el cliente lo recibe por correo. Se libera el stock reservado y el pedido queda cancelado. Un pedido pagado se resuelve con un reembolso.
+
+El cliente también puede cancelar su pedido desde la tienda mientras no lo haya pagado.
+
+## Qué cambios de estado se permiten
+| Desde | Puede pasar a | Condición |
+| --- | --- | --- |
+| Pendiente de pago | En preparación | Pago confirmado |
+| Pendiente de pago | Cancelado | Aún no se paga |
+| En preparación | Completado | Todo entregado o retirado (lo hace el sistema con los despachos) |
+| En preparación | Cancelado | Reembolso total y nada despachado |
+| Cancelado | En preparación | Solo si se anuló por plazo vencido y llega el pago (por ejemplo, un pago tardío con Webpay) |
+| Completado | — | Lo que vuelve después se gestiona como devolución |
+
+Cualquier otro cambio se rechaza con un mensaje que explica por qué. Si un cliente paga con Webpay un pedido que cancelaste a mano, el pago queda registrado con una nota para reembolsarlo.
+
+## Notas
+**Agregar nota** guarda un comentario en el historial del pedido. Si marcas *El cliente la ve en su pedido*, aparece en la página del pedido del cliente; si no, solo la ve el equipo.
+
+## Devoluciones
+**Registrar devolución** crea una solicitud de devolución o cambio para un pedido pagado (por ejemplo, si el cliente llamó). La sección *Devoluciones* del pedido muestra las solicitudes y su estado. Ver el manual de Devoluciones y cambios.
+
+## Correos del pedido
+La sección *Correos* (cerrada al inicio) muestra los correos enviados al cliente por este pedido, con su estado. Para reenviar uno, usa *Correos → Historial*.
 
 ## Lo que no cambia
 Cada pedido guarda una copia fija de los productos, precios, IVA y dirección del momento de la compra. Si después cambias un precio o un nombre en el catálogo, el pedido no cambia.
@@ -63,6 +86,8 @@ Cada pedido guarda una copia fija de los productos, precios, IVA y dirección de
 - Ver pedidos: rol *Ventas*, *Finanzas* o *Administrador de tienda*.
 - Confirmar pago: permiso *payments.confirm* (roles *Finanzas* y *Administrador de tienda*).
 - Cancelar: permiso *orders.cancel* (roles *Ventas* y *Administrador de tienda*).
+- Agregar nota: permiso *orders.update*.
+- Registrar devolución: permiso *returns.create*.
 - Consultar en Webpay: permiso *payments.reconcile*.
 - Reembolsar: permiso *refunds.process* (roles *Finanzas* y *Administrador de tienda*).
 
@@ -70,3 +95,5 @@ Cada pedido guarda una copia fija de los productos, precios, IVA y dirección de
 - **Inventario → Reservas** muestra el stock apartado por cada pedido pendiente.
 - **Clientes** muestra los pedidos de cada cliente registrado.
 - **Logística → Despachos e Incidencias** muestran los envíos de cada pedido.
+- **Ventas → Devoluciones** muestra las devoluciones y cambios.
+- **Correos → Historial** muestra cada correo enviado.

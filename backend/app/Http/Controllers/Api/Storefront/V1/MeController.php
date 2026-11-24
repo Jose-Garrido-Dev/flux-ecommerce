@@ -6,7 +6,9 @@ use App\Domain\Customers\Models\Address;
 use App\Domain\Customers\Models\Consent;
 use App\Domain\Customers\Models\Customer;
 use App\Domain\Orders\Models\Order;
+use App\Domain\Orders\Services\OrderPayments;
 use App\Domain\Orders\Services\OrderPresenter;
+use App\Domain\Returns\Services\ReturnService;
 use App\Domain\Shipping\Models\Region;
 use App\Support\Rut;
 use Closure;
@@ -101,6 +103,39 @@ class MeController extends StorefrontController
         }
 
         return response()->json(['data' => $presenter->present($order, full: true)]);
+    }
+
+    public function cancelOrder(Request $request, string $uuid, OrderPayments $payments, OrderPresenter $presenter): JsonResponse
+    {
+        $order = Order::query()->where('customer_id', $request->user()->id)->where('uuid', $uuid)->first();
+        if (! $order) {
+            return $this->problem(404, 'not_found', 'El pedido no existe.');
+        }
+        $payments->cancel($order, 'Lo cancelaste desde tu cuenta.', 'customer');
+
+        return response()->json(['data' => $presenter->present($order->fresh(), full: true)]);
+    }
+
+    public function requestReturn(Request $request, string $uuid, ReturnService $returns, OrderPresenter $presenter): JsonResponse
+    {
+        $order = Order::query()->where('customer_id', $request->user()->id)->where('uuid', $uuid)->first();
+        if (! $order) {
+            return $this->problem(404, 'not_found', 'El pedido no existe.');
+        }
+
+        return OrderTrackingController::storeReturn($order, $request, $returns, $presenter, full: true);
+    }
+
+    public function cancelReturn(Request $request, string $uuid, string $returnUuid, ReturnService $returns, OrderPresenter $presenter): JsonResponse
+    {
+        $order = Order::query()->where('customer_id', $request->user()->id)->where('uuid', $uuid)->first();
+        $return = $order?->returns()->where('uuid', $returnUuid)->first();
+        if (! $return) {
+            return $this->problem(404, 'not_found', 'La solicitud no existe.');
+        }
+        $returns->cancel($return);
+
+        return response()->json(['data' => $presenter->present($order->fresh(), full: true)]);
     }
 
     public function addresses(Request $request): JsonResponse

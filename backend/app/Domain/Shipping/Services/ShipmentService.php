@@ -4,6 +4,7 @@ namespace App\Domain\Shipping\Services;
 
 use App\Domain\Orders\Models\Order;
 use App\Domain\Orders\Services\OrderEvents;
+use App\Domain\Orders\Services\OrderStateMachine;
 use App\Domain\Shipping\Mail\ShipmentMail;
 use App\Domain\Shipping\Models\Courier;
 use App\Domain\Shipping\Models\Shipment;
@@ -212,7 +213,7 @@ class ShipmentService
             default => 'preparing',
         };
         $changes = ['fulfillment_status' => $fulfillment];
-        if (in_array($fulfillment, ['delivered', 'picked_up'], true) && $order->status === 'processing') {
+        if ($order->status === 'processing' && OrderStateMachine::can($order, 'completed', ['fulfillment_status' => $fulfillment])) {
             $changes['status'] = 'completed';
         }
         $before = $order->only(array_keys($changes));

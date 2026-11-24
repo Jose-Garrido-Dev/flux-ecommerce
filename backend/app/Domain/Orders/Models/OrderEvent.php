@@ -2,6 +2,7 @@
 
 namespace App\Domain\Orders\Models;
 
+use App\Domain\Returns\Models\ReturnRequest;
 use App\Domain\Shipping\Models\Shipment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -25,6 +26,8 @@ class OrderEvent extends Model
         'incident_opened' => 'Incidencia abierta',
         'incident_resolved' => 'Incidencia resuelta',
         'completed' => 'Pedido completado',
+        'return_requested' => 'Devolución solicitada',
+        'return_status' => 'Devolución',
         'note' => 'Nota',
         'email_sent' => 'Correo enviado',
     ];
@@ -51,6 +54,10 @@ class OrderEvent extends Model
     {
         if ($this->type === 'shipment_status' && $this->to_status) {
             return 'Despacho: '.mb_strtolower(Shipment::STATUSES[$this->to_status] ?? $this->to_status);
+        }
+
+        if ($this->type === 'return_status' && $this->to_status) {
+            return 'Devolución '.($this->payload['label'] ?? '').': '.mb_strtolower(ReturnRequest::STATUSES[$this->to_status] ?? $this->to_status);
         }
 
         return self::TYPES[$this->type] ?? $this->type;

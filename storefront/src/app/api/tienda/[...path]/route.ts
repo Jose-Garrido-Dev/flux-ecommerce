@@ -15,7 +15,10 @@ const ALLOWED: Record<string, RegExp[]> = {
   POST: [
     /^cart\/items$/,
     /^checkout$/,
-    /^orders\/[A-Za-z0-9_-]{20,100}\/pay$/,
+    /^orders\/[A-Za-z0-9_-]{20,100}\/(pay|cancel|returns)$/,
+    /^orders\/[A-Za-z0-9_-]{20,100}\/returns\/[0-9a-f-]{36}\/cancel$/,
+    /^me\/orders\/[0-9a-f-]{36}\/(cancel|returns)$/,
+    /^me\/orders\/[0-9a-f-]{36}\/returns\/[0-9a-f-]{36}\/cancel$/,
     /^auth\/(register|login|logout|forgot-password|reset-password|verify-email|resend-verification)$/,
     /^me\/addresses$/,
   ],

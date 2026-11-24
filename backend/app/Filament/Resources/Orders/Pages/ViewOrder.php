@@ -3,14 +3,18 @@
 namespace App\Filament\Resources\Orders\Pages;
 
 use App\Domain\Orders\Models\Order;
+use App\Domain\Orders\Services\OrderEvents;
 use App\Domain\Orders\Services\OrderPayments;
 use App\Domain\Payments\Services\GatewayException;
 use App\Domain\Payments\Services\PaymentProcessor;
 use App\Domain\Payments\Services\RefundService;
+use App\Domain\Returns\Models\ReturnRequest;
+use App\Domain\Returns\Services\ReturnService;
 use App\Domain\Shipping\Models\Courier;
 use App\Domain\Shipping\Services\ShipmentService;
 use App\Filament\Concerns\HasHelpManual;
 use App\Filament\Resources\Orders\OrderResource;
+use App\Filament\Resources\Returns\ReturnResource;
 use App\Filament\Resources\Shipments\ShipmentResource;
 use App\Filament\Support\InventoryActions;
 use Filament\Actions\Action;
@@ -172,13 +176,52 @@ class ViewOrder extends ViewRecord
                     Notification::make()->success()->title('Reembolso hecho')->body('Se avisó al cliente por correo.')->send();
                     $this->refreshFormData([]);
                 }),
+            Action::make('return')->label('Registrar devolución')->icon(Heroicon::OutlinedArrowUturnLeft)->color('gray')
+                ->visible(fn (Order $record) => in_array($record->status, ['processing', 'completed'], true)
+                    && array_sum(app(ReturnService::class)->returnable($record)) > 0)
+                ->authorize(fn () => auth()->user()?->can('returns.create'))
+                ->modalHeading('Registrar una devolución')
+                ->modalDescription('Para cuando el cliente la pide por teléfono, correo o en la tienda. Desde el panel no rige el plazo.')
+                ->modalSubmitActionLabel('Registrar')
+                ->schema(fn (Order $record) => [
+                    Select::make('type')->label('Tipo')->options(ReturnRequest::TYPES)->default('return')->required(),
+                    Select::make('reason')->label('Motivo')->options(ReturnRequest::REASONS)->required(),
+                    Section::make('Productos')->schema(collect(app(ReturnService::class)->returnable($record))
+                        ->filter(fn ($qty) => $qty > 0)
+                        ->map(function ($qty, $id) use ($record) {
+                            $item = $record->items->firstWhere('id', $id);
+
+                            return TextInput::make('items.i'.$id)->label($item->product_name.($item->variant_label ? ' · '.$item->variant_label : ''))
+                                ->helperText('Se pueden devolver hasta '.$qty)->integer()->minValue(0)->maxValue($qty)->default(0);
+                        })->values()->all()),
+                    Textarea::make('notes')->label('Comentario')->maxLength(2000),
+                ])
+                ->action(function (array $data, Order $record) {
+                    $items = collect($data['items'] ?? [])->mapWithKeys(fn ($qty, $key) => [(int) substr($key, 1) => (int) $qty])->all();
+                    $return = InventoryActions::run(fn () => app(ReturnService::class)->request($record, $items, $data['type'], $data['reason'], $data['notes'] ?? null, 'user'));
+                    Notification::make()->success()->title('Devolución registrada')->send();
+                    $this->redirect(ReturnResource::getUrl('view', ['record' => $return]));
+                }),
+            Action::make('note')->label('Agregar nota')->icon(Heroicon::OutlinedChatBubbleBottomCenterText)->color('gray')
+                ->authorize(fn () => auth()->user()?->can('orders.update'))
+                ->modalHeading('Agregar una nota al historial')
+                ->modalSubmitActionLabel('Guardar')
+                ->schema([
+                    Textarea::make('text')->label('Nota')->required()->maxLength(1000)->rows(3),
+                    Toggle::make('visible')->label('El cliente la ve en su pedido')->default(false),
+                ])
+                ->action(function (array $data, Order $record) {
+                    OrderEvents::record($record, 'note', ['text' => $data['text']], visible: (bool) ($data['visible'] ?? false));
+                    Notification::make()->success()->title('Nota guardada')->send();
+                    $this->refreshFormData([]);
+                }),
             Action::make('cancel')->label('Cancelar pedido')->icon(Heroicon::OutlinedXCircle)->color('danger')
                 ->visible(fn (Order $record) => $record->isCancellable())
                 ->authorize(fn () => auth()->user()?->can('orders.cancel'))
                 ->modalHeading('Cancelar pedido')
-                ->modalDescription('Se libera el stock reservado. Esta acción no se puede deshacer.')
+                ->modalDescription('Se libera el stock reservado y el cliente recibe un correo con el motivo. Esta acción no se puede deshacer.')
                 ->modalSubmitActionLabel('Cancelar pedido')->modalCancelActionLabel('Volver')
-                ->schema([TextInput::make('reason')->label('Motivo')->required()->maxLength(255)])
+                ->schema([TextInput::make('reason')->label('Motivo para el cliente')->required()->maxLength(255)])
                 ->action(function (array $data, Order $record) {
                     InventoryActions::run(fn () => app(OrderPayments::class)->cancel($record, $data['reason']));
                     Notification::make()->success()->title('Pedido cancelado')->send();

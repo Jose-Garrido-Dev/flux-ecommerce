@@ -47,6 +47,9 @@ Route::prefix('storefront/v1')->middleware('throttle:storefront')->group(functio
     Route::post('/checkout', [CheckoutController::class, 'store']);
     Route::get('/orders/{token}', [OrderTrackingController::class, 'show']);
     Route::post('/orders/{token}/pay', [OrderTrackingController::class, 'pay']);
+    Route::post('/orders/{token}/cancel', [OrderTrackingController::class, 'cancel'])->middleware('throttle:10,1');
+    Route::post('/orders/{token}/returns', [OrderTrackingController::class, 'requestReturn'])->middleware('throttle:10,1');
+    Route::post('/orders/{token}/returns/{uuid}/cancel', [OrderTrackingController::class, 'cancelReturn'])->whereUuid('uuid')->middleware('throttle:10,1');
     Route::get('/shipments/{token}', [ShipmentTrackingController::class, 'show']);
 
     Route::prefix('auth')->group(function () {
@@ -65,6 +68,9 @@ Route::prefix('storefront/v1')->middleware('throttle:storefront')->group(functio
         Route::put('/password', [MeController::class, 'password']);
         Route::get('/orders', [MeController::class, 'orders']);
         Route::get('/orders/{uuid}', [MeController::class, 'order']);
+        Route::post('/orders/{uuid}/cancel', [MeController::class, 'cancelOrder']);
+        Route::post('/orders/{uuid}/returns', [MeController::class, 'requestReturn']);
+        Route::post('/orders/{uuid}/returns/{returnUuid}/cancel', [MeController::class, 'cancelReturn']);
         Route::get('/addresses', [MeController::class, 'addresses']);
         Route::post('/addresses', [MeController::class, 'storeAddress']);
         Route::patch('/addresses/{id}', [MeController::class, 'updateAddress'])->whereNumber('id');
