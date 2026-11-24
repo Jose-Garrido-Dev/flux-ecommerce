@@ -13,7 +13,7 @@ class Refund extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['payment_id', 'order_id', 'amount', 'reason', 'status', 'external_type', 'authorization_code', 'restocked', 'created_by'];
+    protected $fillable = ['payment_id', 'order_id', 'return_id', 'amount', 'reason', 'status', 'external_type', 'authorization_code', 'restocked', 'created_by'];
 
     public function uniqueIds(): array
     {

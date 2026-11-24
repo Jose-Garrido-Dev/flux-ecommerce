@@ -17,6 +17,24 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ### Agregado
 
+- Fase 8 (pedidos, devoluciones y correos):
+  - Reglas de estado del pedido en un solo lugar: cada cambio prohibido responde 422 con el motivo en español (por ejemplo, completar sin entregar o cancelar un pedido pagado sin reembolso).
+  - El cliente puede cancelar su pedido mientras no lo pague, desde *Mi cuenta* o el enlace del correo, y recibe un correo con el motivo. La cancelación desde el panel, y la automática por plazo vencido, también envían ese correo.
+  - Ficha del pedido: **Agregar nota** (interna o visible para el cliente), **Registrar devolución**, y secciones *Devoluciones* y *Correos*.
+  - Devoluciones y cambios (*Ventas → Devoluciones*):
+    - El cliente las pide desde la tienda dentro del plazo (10 días desde la entrega por defecto), eligiendo productos, cantidades, motivo y si quiere el dinero o un cambio.
+    - La tienda revisa, aprueba con instrucciones o rechaza con motivo, registra la recepción con la condición de cada producto (lo dañado no vuelve al stock) y resuelve con reembolso ligado a la devolución o con el cambio enviado.
+    - Respaldos (fotos o documentos) en el disco del servidor.
+    - Correos en cada paso y aviso a la tienda.
+    - Configuración en *Configuración → Devoluciones*.
+  - Correos (*Correos → Plantillas* y *Correos → Historial*):
+    - 16 plantillas con asunto, título y texto inicial editables. Las variables se escapan.
+    - Vista previa, envío de prueba, volver al texto original y desactivar los correos opcionales.
+    - Historial de cada envío con estado, intentos y error; 3 intentos (ahora, al minuto y a los 5 minutos) y botón **Reenviar**.
+  - API 0.9.0:
+    - `POST /orders/{token}/cancel`, `POST /orders/{token}/returns`, `POST /orders/{token}/returns/{uuid}/cancel` y sus equivalentes en `/me/orders/{uuid}`.
+    - Nuevos campos en el pedido: `can_cancel`, `returns`, `return_policy`, e `id` y `returnable_quantity` en cada ítem.
+  - Manuales: devoluciones y correos; pedidos actualizado.
 - Fase 7 (envíos y seguimiento):
   - Motor de tarifas: zonas de envío (regiones completas, comunas sueltas, comunas excluidas y prioridad), tarifas por zona y rango de peso (límites incluidos), peso volumétrico por factor, peso máximo, cadena de frío, envío gratis desde un monto y retiro en tienda con dirección, horario e instrucciones.
   - El checkout cotiza con la comuna y el peso del carrito; al pagar, el servidor vuelve a calcular y guarda zona, courier y peso cobrado en el pedido.

@@ -1,7 +1,7 @@
 <x-mail::message>
-# Hola, {{ $name }}
+# {!! $tpl['heading'] !!}
 
-Recibimos una solicitud para cambiar la contraseña de tu cuenta en {{ $store }}.
+{!! $tpl['intro'] !!}
 
 <x-mail::button :url="$url">
 Elegir una nueva contraseña

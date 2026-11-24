@@ -425,7 +425,7 @@ El panel mostrará una alerta si el scheduler deja de reportar actividad.
 
 **Pagos con Webpay pendientes.** El mismo comando `orders:expire-unpaid` consulta primero a Transbank los pagos que quedaron sin respuesta (el cliente pagó y cerró el navegador antes de volver a la tienda) y los confirma o los da por no completados. Sin scheduler, esos pedidos quedan pendientes hasta que alguien pulse *Consultar en Webpay* en el pedido.
 
-**Correos de la tienda.** La confirmación del pedido, el aviso de pago recibido, el aviso de pedido nuevo para la tienda, la confirmación de correo y la recuperación de contraseña se envían por la cola. Si no llegan, revisa que el worker esté corriendo.
+**Correos de la tienda.** Todos los correos (pedido, pago, cancelación, reembolso, despachos, devoluciones y cuenta del cliente) se envían por la cola. Cada uno queda en *Correos → Historial* con su estado: si fallan, la cola los reintenta al minuto y a los 5 minutos; después de 3 intentos quedan como *Falló* y se pueden reenviar desde ahí. Si quedan en *En cola*, el worker no está corriendo.
 
 **Importaciones de productos.** Las importaciones de CSV o Excel corren en el worker de colas. Si una importación se queda en "En cola" más de un minuto, el worker no está corriendo. En desarrollo sin Docker, ábrelo en otra terminal con `php artisan queue:work`.
 
@@ -467,7 +467,7 @@ Ninguna integración se considera operativa hasta que se prueba con credenciales
 | Khipu | Transferencia simplificada | ID de cobrador y llave secreta | Panel → Configuración → Pagos | Pendiente: requiere una cuenta de prueba propia. No verificada |
 | Transferencia bancaria | Pago manual | Datos de la cuenta bancaria de la empresa | Panel → Configuración → Pagos | Disponible (Fase 5). No usa servicios externos: el pago se confirma a mano en el panel |
 | Chilexpress / Starken / Blue Express | Cotizar, generar etiquetas y tracking | Contrato comercial y credenciales de API con cada courier | Panel → Logística → Couriers | Modo manual disponible (Fase 7): tarifas propias por zona y peso, número de seguimiento ingresado a mano y enlace al sitio del courier. Conexión por API: No verificada (faltan credenciales de prueba). Ver sección 8.3 |
-| Correo transaccional | Confirmaciones, recuperación de contraseña | Cuenta SMTP o API (Resend, Postmark, Amazon SES, Brevo) y registros SPF, DKIM y DMARC en el DNS | `backend/.env` (Fase 1) y panel (Fase 8) | Configurable vía `.env` |
+| Correo transaccional | Pedidos, pagos, despachos, devoluciones y cuenta del cliente | Cuenta SMTP (la de tu hosting sirve) o un proveedor (Resend, Postmark, Amazon SES, Brevo) y registros SPF, DKIM y DMARC en el DNS | Servidor en `backend/.env`; textos en *Correos → Plantillas* | Configurable vía `.env`; textos editables y prueba de envío desde el panel |
 | Proveedor de IA | Asistente y generación de contenido | API Key (por defecto Anthropic Claude) y presupuesto mensual | Panel → Configuración → IA | Pendiente (Fase 12) |
 | Facturación electrónica SII | Boletas y facturas | Proveedor certificado (Bsale, OpenFactura, Nubox, etc.) | Interfaz preparada | Fuera de alcance inicial |
 
@@ -588,6 +588,14 @@ Al actualizar desde la Fase 3: los productos que ya existían quedan con **Contr
 
 Las imágenes se guardan en el disco del servidor, en `backend/storage/app/public/catalog`. Cada imagen se reduce a 2400 px como máximo y se le genera una miniatura. Inclúyelas en los respaldos (sección 7.2). Cada pantalla del panel tiene su botón **Manual de uso**.
 
+### 9.4 Correos y devoluciones
+
+1. **Correos → Plantillas**: revisa el asunto, el título y el texto inicial de los 16 correos. Usa **Vista previa** y **Enviarme una prueba** para comprobar que tu servidor SMTP funciona (si falla, el mensaje dice por qué).
+2. **Configuración → Devoluciones**: define si los clientes piden devoluciones en línea, el plazo (10 días por defecto, desde la entrega), si ofreces cambios, y escribe las instrucciones para enviar el producto y tu política.
+3. **Configuración → Datos del negocio → Correo de contacto**: ahí llegan los avisos de pedidos nuevos y de solicitudes de devolución.
+
+El detalle de cada pantalla está en el manual del panel (botón **Manual** en cada página): *Correos* y *Devoluciones y cambios*.
+
 ## 10. Pruebas y calidad
 
 ```bash
@@ -633,6 +641,9 @@ La lista de palabras está en `packages/qa/palabras-ingles.json`. Si una palabra
 | Con Webuzo, el dominio muestra la página por defecto de Webuzo | Falta el archivo de proxy del dominio o no se reinició el servidor web | Revisar el paso 6 de la sección 6.7 |
 | Error 502 en la API justo después de actualizar | Nginx apuntaba a la IP antigua del contenedor `app` (corregido en la configuración incluida) o PHP aún está arrancando | Esperar unos segundos; si sigue, `docker compose -f compose.prod.yml --env-file .env restart web` |
 | Con Webuzo, error 502/503 en el dominio | Los contenedores de Flux no están corriendo | `docker compose -f compose.prod.yml --env-file .env ps` |
+| Un correo aparece como *Falló* en *Correos → Historial* | El servidor SMTP rechazó la conexión o el remitente | Ver el error en el historial, corregir `MAIL_*` en `backend/.env`, reiniciar el worker y pulsar **Reenviar** |
+| Los correos quedan *En cola* | El worker no está corriendo | Sección 7.1 |
+| El cliente no ve el botón para pedir una devolución | El pedido no está entregado, venció el plazo o las devoluciones en línea están desactivadas | El pedido muestra el motivo; *Configuración → Devoluciones* |
 | La tienda muestra "Agotado" aunque hay stock | Stock reservado por carritos que no se liberan porque el scheduler no corre, o la bodega está inactiva | Revisar *Inventario → Reservas* y la sección 7.1; revisar el estado de la bodega |
 | No se puede cargar stock en un producto | El rol del usuario no tiene permiso de inventario | Asignar el rol *Inventario* o *Administrador de tienda* en Usuarios |
 | El checkout dice que no hay medios de pago activos | La transferencia no está activada o le faltan datos | *Configuración → Pagos* |

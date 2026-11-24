@@ -2,18 +2,22 @@
 
 namespace App\Filament\Resources\Orders;
 
+use App\Domain\Notifications\Models\EmailLog;
 use App\Domain\Orders\Models\Order;
 use App\Domain\Orders\Models\OrderEvent;
 use App\Domain\Orders\Models\OrderItem;
 use App\Domain\Orders\Models\Payment;
 use App\Domain\Payments\Gateways\WebpayPlus\WebpayPlusGateway;
 use App\Domain\Payments\Models\Refund;
+use App\Domain\Returns\Models\ReturnRequest;
 use App\Domain\Shipping\Models\Courier;
 use App\Domain\Shipping\Models\Shipment;
 use App\Domain\Shipping\Models\ShippingIncident;
 use App\Domain\Shipping\Services\RateEngine;
+use App\Filament\Resources\EmailLogs\EmailLogResource;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
+use App\Filament\Resources\Returns\ReturnResource;
 use App\Filament\Resources\Shipments\ShipmentResource;
 use BackedEnum;
 use Filament\Actions\ViewAction;
@@ -73,6 +77,14 @@ class OrderResource extends Resource
         return match ($state) {
             'pending' => 'warning', 'processing', 'paid' => 'info', 'completed' => 'success', default => 'gray',
         };
+    }
+
+    public static function getRecordRouteBindingEloquentQuery(): Builder
+    {
+        return parent::getRecordRouteBindingEloquentQuery()->with([
+            'items', 'shippingLine', 'latestPayment', 'payments', 'refunds.creator', 'events',
+            'shipments.items.orderItem', 'returns.items.orderItem', 'emailLogs',
+        ]);
     }
 
     public static function infolist(Schema $schema): Schema
@@ -136,6 +148,19 @@ class OrderResource extends Resource
                             ->belowContent(fn (Refund $record) => $record->restocked ? 'Productos devueltos al stock' : null),
                     ]),
                 ]),
+                Section::make('Devoluciones')->visible(fn (Order $record) => $record->returns()->exists())->schema([
+                    RepeatableEntry::make('returns')->label('Devoluciones')->hiddenLabel()->columns(4)->schema([
+                        TextEntry::make('type')->label('Solicitud')
+                            ->formatStateUsing(fn ($state, ReturnRequest $record) => $record->label().' · '.(ReturnRequest::TYPES[$state] ?? $state))
+                            ->belowContent(fn (ReturnRequest $record) => ReturnRequest::REASONS[$record->reason] ?? null)
+                            ->url(fn (ReturnRequest $record) => ReturnResource::getUrl('view', ['record' => $record])),
+                        TextEntry::make('status')->label('Estado')->badge()
+                            ->formatStateUsing(fn ($state) => ReturnRequest::STATUSES[$state] ?? $state)
+                            ->color(fn ($state) => ReturnResource::statusColor($state)),
+                        TextEntry::make('contents')->label('Productos')->columnSpan(2)
+                            ->state(fn (ReturnRequest $record) => $record->items->map(fn ($i) => $i->quantity.' × '.$i->orderItem?->product_name)->implode(', ')),
+                    ]),
+                ]),
                 Section::make('Historial')->schema([
                     RepeatableEntry::make('events')->label('Historial')->hiddenLabel()->columns(3)->schema([
                         TextEntry::make('created_at')->label('Fecha')->dateTime('d-m-Y H:i'),
@@ -144,6 +169,19 @@ class OrderResource extends Resource
                             ->state(fn (OrderEvent $record) => self::eventDetail($record)),
                     ]),
                 ]),
+                Section::make('Correos')->description('Correos enviados al cliente y a la tienda por este pedido.')
+                    ->visible(fn (Order $record) => $record->emailLogs()->exists())->collapsed()->schema([
+                        RepeatableEntry::make('emailLogs')->label('Correos')->hiddenLabel()->columns(4)->schema([
+                            TextEntry::make('created_at')->label('Fecha')->dateTime('d-m-Y H:i'),
+                            TextEntry::make('template_key')->label('Correo')->columnSpan(2)
+                                ->formatStateUsing(fn ($state, EmailLog $record) => $record->templateName())
+                                ->belowContent(fn (EmailLog $record) => $record->to),
+                            TextEntry::make('status')->label('Estado')->badge()
+                                ->formatStateUsing(fn ($state) => EmailLog::STATUSES[$state] ?? $state)
+                                ->color(fn ($state) => EmailLogResource::statusColor($state))
+                                ->belowContent(fn (EmailLog $record) => $record->status === 'failed' ? mb_substr((string) $record->last_error, 0, 120) : null),
+                        ]),
+                    ]),
             ]),
             Grid::make(1)->schema([
                 Section::make('Estado')->schema([
@@ -230,6 +268,7 @@ class OrderResource extends Resource
             'note' => $p['text'] ?? null,
             'shipment_created' => $p['carrier'] ?? null,
             'incident_opened' => ShippingIncident::TYPES[$p['type'] ?? ''] ?? null,
+            'return_requested', 'return_status' => $p['label'] ?? null,
             default => null,
         };
     }

@@ -4,8 +4,6 @@ namespace App\Domain\Orders\Mail;
 
 use App\Domain\Orders\Models\Order;
 use App\Domain\Payments\Models\Refund;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 
 /** Al cliente: hicimos un reembolso. */
 class RefundMail extends OrderMail
@@ -15,19 +13,25 @@ class RefundMail extends OrderMail
         parent::__construct($order);
     }
 
-    public function envelope(): Envelope
+    public function templateKey(): string
     {
-        return new Envelope(subject: "Reembolso del pedido N.º {$this->order->number} · {$this->storeName()}");
+        return 'refund';
     }
 
-    public function content(): Content
+    protected function markdownView(): string
+    {
+        return 'mail.orders.refunded';
+    }
+
+    protected function variables(): array
+    {
+        return ['monto' => self::money($this->refund->amount)];
+    }
+
+    protected function viewData(): array
     {
         $method = $this->refund->payment?->method_code;
 
-        return new Content(markdown: 'mail.orders.refunded', with: [
-            ...$this->common(),
-            'refund' => $this->refund,
-            'byCard' => $method !== null && $method !== 'bank_transfer',
-        ]);
+        return ['refund' => $this->refund, 'byCard' => $method !== null && $method !== 'bank_transfer'];
     }
 }

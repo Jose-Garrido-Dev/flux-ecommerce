@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             TaxClassSeeder::class,
             RolesAndPermissionsSeeder::class,
             ModuleStatusSeeder::class,
+            EmailTemplateSeeder::class,
         ]);
     }
 }

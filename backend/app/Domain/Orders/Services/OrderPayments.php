@@ -5,6 +5,7 @@ namespace App\Domain\Orders\Services;
 use App\Domain\Inventory\Models\StockReservation;
 use App\Domain\Inventory\Services\InventoryService;
 use App\Domain\Orders\Mail\NewOrderNotificationMail;
+use App\Domain\Orders\Mail\OrderCancelledMail;
 use App\Domain\Orders\Mail\PaymentConfirmedMail;
 use App\Domain\Orders\Models\Order;
 use App\Domain\Orders\Models\Payment;
@@ -64,11 +65,15 @@ class OrderPayments
             // Un pago que llega por la pasarela después de que el pedido se anuló: si ya no hay stock, hay que devolver el dinero
             if ($order->status === 'cancelled') {
                 try {
+                    if (! $expired) {
+                        // Anulado a mano: no se reactiva solo (OrderStateMachine); el pago queda registrado para reembolsarlo
+                        throw ValidationException::withMessages(['status' => 'Pedido anulado']);
+                    }
                     DB::transaction(fn () => $this->consumeStock($order));
                 } catch (ValidationException) {
                     $needsRefund = true;
                     $order->update(['payment_status' => 'paid', 'paid_total' => $payment->amount, 'paid_at' => now()]);
-                    OrderEvents::record($order, 'note', ['text' => 'Llegó el pago de un pedido anulado y ya no hay stock para reponerlo. Hay que reembolsar al cliente.'], visible: false, actor: 'system');
+                    OrderEvents::record($order, 'note', ['text' => $expired ? 'Llegó el pago de un pedido anulado y ya no hay stock para reponerlo. Hay que reembolsar al cliente.' : 'Llegó el pago de un pedido que se había cancelado. Hay que reembolsar al cliente.'], visible: false, actor: 'system');
                     app(AuditLogger::class)->record('Order.payment_confirmed', $order, ['payment_status' => $order->getOriginal('payment_status')], ['payment_status' => 'paid', 'requires_refund' => true]);
 
                     return true;
@@ -77,6 +82,7 @@ class OrderPayments
                 $this->consumeStock($order);
             }
 
+            OrderStateMachine::assert($order, 'processing', ['payment_status' => 'paid'], 'amount');
             $order->update(['status' => 'processing', 'payment_status' => 'paid', 'paid_total' => $payment->amount, 'paid_at' => now(), 'cancelled_at' => null]);
             OrderEvents::record($order, 'payment_confirmed', array_filter([
                 'amount' => $payment->amount, 'method' => $payment->method_code,
@@ -99,18 +105,21 @@ class OrderPayments
         return $confirmed;
     }
 
-    public function cancel(Order $order, string $reason): void
+    /** @param  string  $actor  user (panel) o customer (el cliente desde la tienda). El motivo se muestra al cliente. */
+    public function cancel(Order $order, string $reason, string $actor = 'user'): void
     {
-        DB::transaction(function () use ($order, $reason) {
+        DB::transaction(function () use ($order, $reason, $actor) {
             $order = Order::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
             if (! $order->isCancellable()) {
                 throw ValidationException::withMessages(['reason' => 'Solo se cancelan pedidos pendientes de pago. Un pedido pagado se anula con un reembolso.']);
             }
+            OrderStateMachine::assert($order, 'cancelled', field: 'reason');
             $this->releaseStock($order, 'released', $reason);
             Payment::query()->where('order_id', $order->id)->whereIn('status', ['pending', 'failed', 'aborted'])->update(['status' => 'cancelled']);
             $order->update(['status' => 'cancelled', 'payment_status' => 'cancelled', 'cancelled_at' => now()]);
-            OrderEvents::record($order, 'cancelled', ['reason' => $reason], visible: true, from: 'pending', to: 'cancelled');
-            app(AuditLogger::class)->record('Order.cancelled', $order, ['status' => 'pending'], ['status' => 'cancelled', 'reason' => $reason]);
+            OrderEvents::record($order, 'cancelled', ['reason' => $reason], visible: true, from: 'pending', to: 'cancelled', actor: $actor === 'customer' ? 'customer' : null);
+            app(AuditLogger::class)->record('Order.cancelled', $order, ['status' => 'pending'], ['status' => 'cancelled', 'reason' => $reason, 'by' => $actor]);
+            Mail::to($order->email)->queue(new OrderCancelledMail($order, $reason));
         });
     }
 
@@ -137,12 +146,16 @@ class OrderPayments
                     if ($order->status !== 'pending' || $payment->id !== $latest || ! in_array($payment->status, ['pending', 'failed', 'aborted'], true)) {
                         return;
                     }
+                    if (! OrderStateMachine::can($order, 'cancelled')) {
+                        return;
+                    }
                     $this->releaseStock($order, 'expired', 'Plazo de pago vencido');
                     if ($payment->status === 'pending') {
                         $payment->update(['status' => 'expired']);
                     }
                     $order->update(['status' => 'cancelled', 'payment_status' => 'expired', 'cancelled_at' => now()]);
                     OrderEvents::record($order, 'payment_expired', [], visible: true, from: 'pending', to: 'cancelled', actor: 'system');
+                    Mail::to($order->email)->queue(new OrderCancelledMail($order, 'El plazo para pagar venció y liberamos los productos.'));
                     $count++;
                 });
             });

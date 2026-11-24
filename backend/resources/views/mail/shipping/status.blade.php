@@ -1,35 +1,14 @@
 <x-mail::message>
-@switch($kind)
-@case('ready_for_pickup')
-# Tu pedido está listo para retiro
+# {!! $tpl['heading'] !!}
 
-Hola {{ $order->first_name }}, ya puedes retirar tu pedido N.º {{ $order->number }}.
+{!! $tpl['intro'] !!}
 
-@if ($order->shippingLine?->pickup_address)
+@if ($kind === 'ready_for_pickup' && $order->shippingLine?->pickup_address)
 **Dirección:** {{ $order->shippingLine->pickup_address }}
 @endif
-
-Lleva tu número de pedido y un documento de identidad.
-@break
-@case('delivered')
-# Entregamos tu pedido
-
-Hola {{ $order->first_name }}, tu pedido N.º {{ $order->number }} fue entregado. ¡Gracias por tu compra!
-@break
-@case('picked_up')
-# Retiraste tu pedido
-
-Hola {{ $order->first_name }}, registramos el retiro de tu pedido N.º {{ $order->number }}. ¡Gracias por tu compra!
-@break
-@default
-# Tu pedido va en camino
-
-Hola {{ $order->first_name }}, tu pedido N.º {{ $order->number }} salió con **{{ $shipment->carrier_name }}**.
-
-@if ($shipment->tracking_number)
+@if ($kind === 'shipped' && $shipment->tracking_number)
 **Número de seguimiento:** {{ $shipment->tracking_number }}
 @endif
-@endswitch
 
 <x-mail::table>
 | Producto | Cantidad |

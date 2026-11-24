@@ -9,6 +9,7 @@ use App\Domain\Orders\Mail\RefundMail;
 use App\Domain\Orders\Models\Order;
 use App\Domain\Orders\Models\Payment;
 use App\Domain\Orders\Services\OrderEvents;
+use App\Domain\Orders\Services\OrderStateMachine;
 use App\Domain\Payments\Models\Refund;
 use App\Domain\System\Services\AuditLogger;
 use Illuminate\Support\Facades\Auth;
@@ -30,7 +31,7 @@ class RefundService
         private readonly InventoryService $inventory,
     ) {}
 
-    public function refund(Order $order, int $amount, string $reason, bool $restock = false): Refund
+    public function refund(Order $order, int $amount, string $reason, bool $restock = false, ?int $returnId = null): Refund
     {
         $lock = Cache::lock('flux:refund:order:'.$order->id, 60);
         if (! $lock->get()) {
@@ -63,22 +64,23 @@ class RefundService
                 }
             }
 
-            $refund = DB::transaction(function () use ($order, $payment, $amount, $reason, $restock, $full, $gatewayResult) {
+            $refund = DB::transaction(function () use ($order, $payment, $amount, $reason, $restock, $full, $gatewayResult, $returnId) {
                 $order = Order::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
                 $payment = Payment::query()->whereKey($payment->id)->lockForUpdate()->firstOrFail();
 
                 $refund = Refund::query()->create([
-                    'payment_id' => $payment->id, 'order_id' => $order->id, 'amount' => $amount, 'reason' => $reason,
+                    'payment_id' => $payment->id, 'order_id' => $order->id, 'return_id' => $returnId, 'amount' => $amount, 'reason' => $reason,
                     'status' => 'completed', 'external_type' => $gatewayResult?->type, 'authorization_code' => $gatewayResult?->authorizationCode,
                     'restocked' => $restock, 'created_by' => Auth::id(),
                 ]);
                 $payment->increment('refunded_amount', $amount);
                 $refundedTotal = $order->refunded_total + $amount;
                 $from = $order->status;
-                $cancel = $full && $order->fulfillment_status === 'unfulfilled';
+                $newPaymentStatus = $refundedTotal >= $order->paid_total ? 'refunded' : 'partially_refunded';
+                $cancel = $full && $order->status === 'processing' && OrderStateMachine::can($order, 'cancelled', ['payment_status' => $newPaymentStatus]);
                 $order->update([
                     'refunded_total' => $refundedTotal,
-                    'payment_status' => $refundedTotal >= $order->paid_total ? 'refunded' : 'partially_refunded',
+                    'payment_status' => $newPaymentStatus,
                     ...($cancel ? ['status' => 'cancelled', 'cancelled_at' => now()] : []),
                 ]);
 

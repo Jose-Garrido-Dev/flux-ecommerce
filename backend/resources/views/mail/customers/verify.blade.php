@@ -1,7 +1,7 @@
 <x-mail::message>
-# Hola, {{ $name }}
+# {!! $tpl['heading'] !!}
 
-Gracias por crear tu cuenta en {{ $store }}. Confirma tu correo para ver en tu cuenta los pedidos que hiciste antes con este mismo correo.
+{!! $tpl['intro'] !!}
 
 <x-mail::button :url="$url">
 Confirmar mi correo

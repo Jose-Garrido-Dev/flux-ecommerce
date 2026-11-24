@@ -3,6 +3,7 @@ import type { OrderDetail } from "@/lib/types";
 import { formatMoney, mediaUrl } from "@/lib/format";
 import { PayButton } from "./PayButton";
 import { ShipmentCard } from "./ShipmentCard";
+import { OrderActions } from "./OrderActions";
 
 const dateFormat = new Intl.DateTimeFormat("es-CL", { dateStyle: "long", timeStyle: "short", timeZone: "America/Santiago" });
 
@@ -11,7 +12,7 @@ export function formatDate(iso: string | null): string {
 }
 
 /** Detalle de un pedido: estado, datos de transferencia (si falta pagar), productos y totales. */
-export function OrderView({ order, orderToken }: { order: OrderDetail; orderToken?: string }) {
+export function OrderView({ order, orderToken, apiBase }: { order: OrderDetail; orderToken?: string; apiBase?: string }) {
   const transfer = order.payment.transfer;
   const pay = order.payment;
   const address = order.shipping.address;
@@ -100,6 +101,8 @@ export function OrderView({ order, orderToken }: { order: OrderDetail; orderToke
             ))}
           </ul>
         </section>
+
+        {apiBase && <OrderActions order={order} apiBase={apiBase} />}
 
         {order.events.length > 0 && (
           <section aria-labelledby="historial-titulo">

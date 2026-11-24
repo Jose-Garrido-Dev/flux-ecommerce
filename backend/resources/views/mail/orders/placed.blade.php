@@ -1,7 +1,7 @@
 <x-mail::message>
-# ¡Gracias por tu compra, {{ $order->first_name }}!
+# {!! $tpl['heading'] !!}
 
-Recibimos tu pedido **N.º {{ $order->number }}**. Para completarlo, transfiere el total a la siguiente cuenta:
+{!! $tpl['intro'] !!}
 
 <x-mail::panel>
 **Monto:** ${{ number_format($order->grand_total, 0, ',', '.') }}<br>

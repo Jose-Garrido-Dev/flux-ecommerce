@@ -1,5 +1,7 @@
 <x-mail::message>
-# Nuevo pedido N.º {{ $order->number }}
+# {!! $tpl['heading'] !!}
+
+{!! $tpl['intro'] !!}
 
 **Cliente:** {{ $order->fullName() }} ({{ $order->email }})<br>
 @if ($order->payment_status === 'paid')
