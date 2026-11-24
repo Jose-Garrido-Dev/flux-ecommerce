@@ -8,7 +8,7 @@ function parts(ms: number) {
 }
 
 /** Cuenta regresiva hasta el fin real de una oferta (fecha que entrega Laravel). */
-export function Countdown({ until }: { until: string }) {
+export function Countdown({ until, label = "Tiempo restante de la oferta" }: { until: string; label?: string }) {
   const end = new Date(until).getTime();
   const [now, setNow] = useState<number | null>(null);
 
@@ -27,7 +27,7 @@ export function Countdown({ until }: { until: string }) {
   ];
 
   return (
-    <div role="timer" aria-label="Tiempo restante de la oferta" className="flex gap-3">
+    <div role="timer" aria-label={label} className="flex gap-3">
       {cells.map(([v, label]) => (
         <div key={label} className="min-w-16 rounded-[var(--radius-sm)] border border-white/10 bg-white/5 px-3 py-3 text-center backdrop-blur">
           <span className="block font-display text-3xl tabular-nums" aria-hidden={label === "seg"}>

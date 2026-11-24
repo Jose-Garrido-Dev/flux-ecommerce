@@ -5,6 +5,10 @@ namespace Tests\Feature\Language;
 use App\Domain\Cart\Services\CartService;
 use App\Domain\Catalog\Models\Brand;
 use App\Domain\Catalog\Models\Category;
+use App\Domain\Catalog\Models\Media;
+use App\Domain\Content\Models\Menu;
+use App\Domain\Content\Models\Theme;
+use App\Domain\Content\Services\PageService;
 use App\Domain\Customers\Models\Customer;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Models\InventoryLevel;
@@ -24,6 +28,7 @@ use App\Filament\Pages\InventorySettings;
 use App\Filament\Pages\PaymentSettingsPage;
 use App\Filament\Pages\ReturnSettingsPage;
 use App\Filament\Pages\ShippingSimulator;
+use App\Filament\Pages\ThemesPage;
 use App\Filament\Resources\Attributes\Pages\ListAttributes;
 use App\Filament\Resources\Brands\Pages\ManageBrands;
 use App\Filament\Resources\Categories\Pages\ListCategories;
@@ -32,8 +37,16 @@ use App\Filament\Resources\Customers\Pages\ViewCustomer;
 use App\Filament\Resources\EmailLogs\Pages\ManageEmailLogs;
 use App\Filament\Resources\EmailTemplates\Pages\EditEmailTemplate;
 use App\Filament\Resources\InventoryLevels\Pages\ListInventoryLevels;
+use App\Filament\Resources\MediaFolders\Pages\ManageMediaFolders;
+use App\Filament\Resources\MediaLibrary\Pages\ManageMedia;
+use App\Filament\Resources\Menus\Pages\EditMenu;
+use App\Filament\Resources\Menus\Pages\ListMenus;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
+use App\Filament\Resources\Pages\Pages\CreatePage;
+use App\Filament\Resources\Pages\Pages\EditPage;
+use App\Filament\Resources\Pages\Pages\ListPages;
+use App\Filament\Resources\Pages\RelationManagers\VersionsRelationManager;
 use App\Filament\Resources\Products\Pages\CreateProduct;
 use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Resources\Products\Pages\ListProducts;
@@ -235,6 +248,58 @@ class SpanishOnlyModalsTest extends TestCase
         $this->check('Historial: reenviar', Livewire::test(ManageEmailLogs::class)->mountTableAction('resend', $sent));
         $broken = EmailLog::query()->create(['template_key' => 'order_placed', 'to' => 'ana@correo.cl', 'status' => 'failed', 'attempts' => 3, 'mailable' => 'dañado']);
         $this->check('Historial: reenviar sin contenido', Livewire::test(ManageEmailLogs::class)->callTableAction('resend', $broken));
+
+        $this->assertSame([], array_values(array_unique($this->problems)),
+            "Texto en inglés en modales o validaciones:\n".implode("\n", array_unique($this->problems)));
+    }
+
+    public function test_content_modals_and_validation_messages_are_in_spanish(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('super-admin');
+        $this->actingAs($admin);
+
+        $pages = app(PageService::class);
+        $page = $pages->create(['title' => 'Nosotros', 'slug' => 'nosotros'], [['type' => 'rich_text', 'data' => ['body' => 'Uno']]]);
+        $pages->publish($page);
+        $pages->saveVersion($page, [['type' => 'rich_text', 'data' => ['body' => 'Dos']]]);
+        $draft = $pages->create(['title' => 'Vacía', 'slug' => 'vacia']);
+        $image = Media::query()->create(['disk' => 'public', 'path' => 'contenido/a.jpg', 'mime' => 'image/jpeg', 'size' => 10, 'width' => 10, 'height' => 10, 'checksum' => str_repeat('a', 64)]);
+
+        $this->check('Páginas: listado', Livewire::test(ListPages::class));
+        $this->check('Páginas: crear portada editable', Livewire::test(ListPages::class)->mountAction('homeFromCurrent'));
+        $this->check('Páginas: nueva (vacía)', Livewire::test(CreatePage::class)->fillForm(['title' => '', 'type' => null])->call('create'));
+        $this->check('Páginas: nueva con dirección reservada', Livewire::test(CreatePage::class)->fillForm(['title' => 'Carro', 'type' => 'institutional', 'slug' => 'carrito'])->call('create'));
+        $edit = fn ($record = null) => Livewire::test(EditPage::class, ['record' => ($record ?? $page)->getRouteKey()]);
+        $this->check('Página: editar', $edit());
+        $this->check('Página: bloque sin titular', $edit()->fillForm(['blocks' => [['type' => 'hero', 'data' => ['title' => '']]]])->call('save'));
+        $this->check('Página: enlace inválido', $edit()->fillForm(['blocks' => [['type' => 'hero', 'data' => ['title' => 'Hola', 'button_link' => 'javascript:alert(1)']]]])->call('save'));
+        $this->check('Página: publicar', $edit()->mountAction('publish'));
+        $this->check('Página: publicar sin bloques', $edit($draft)->callAction('publish'));
+        $this->check('Página: despublicar', $edit()->mountAction('unpublish'));
+        $versions = fn () => Livewire::test(VersionsRelationManager::class, ['ownerRecord' => $page, 'pageClass' => EditPage::class]);
+        $first = $page->versions()->where('number', 1)->firstOrFail();
+        $this->check('Versiones: listado', $versions());
+        $this->check('Versiones: restaurar', $versions()->mountTableAction('restore', $first));
+        $this->check('Versiones: publicar', $versions()->mountTableAction('publishVersion', $first));
+
+        $menu = Menu::for('header');
+        $this->check('Menús: listado', Livewire::test(ListMenus::class));
+        $this->check('Menú: enlace vacío', Livewire::test(EditMenu::class, ['record' => $menu->getRouteKey()])
+            ->fillForm(['items' => [['label' => '', 'link_type' => 'url', 'url' => 'nada']]])->call('save'));
+
+        $this->check('Biblioteca: listado', Livewire::test(ManageMedia::class));
+        $this->check('Biblioteca: subir', Livewire::test(ManageMedia::class)->mountAction('upload'));
+        $this->check('Biblioteca: subir (vacío)', Livewire::test(ManageMedia::class)->callAction('upload', data: []));
+        $this->check('Biblioteca: editar', Livewire::test(ManageMedia::class)->mountTableAction('edit', $image));
+        $this->check('Biblioteca: dónde se usa', Livewire::test(ManageMedia::class)->mountTableAction('usage', $image));
+        $this->check('Biblioteca: eliminar', Livewire::test(ManageMedia::class)->mountTableAction('delete', $image));
+        $this->check('Carpetas: nueva (vacía)', Livewire::test(ManageMediaFolders::class)->callAction('create', data: []));
+
+        $this->check('Temas', Livewire::test(ThemesPage::class));
+        $this->check('Temas: usar', Livewire::test(ThemesPage::class)->mountAction('activate', ['theme' => Theme::query()->where('code', 'lujo')->value('id')]));
+        $this->check('Temas: contraste insuficiente', Livewire::test(ThemesPage::class)->fillForm(['accent' => '#ffffff', 'accent-fg' => '#fefefe'])->call('save'));
 
         $this->assertSame([], array_values(array_unique($this->problems)),
             "Texto en inglés en modales o validaciones:\n".implode("\n", array_unique($this->problems)));

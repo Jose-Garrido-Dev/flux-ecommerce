@@ -8,6 +8,18 @@ export type PublicStore = {
   announcements: string[];
   contact: { email: string | null; phone: string | null };
   social: Partial<Record<"instagram" | "facebook" | "tiktok", string>>;
+  /** Tema activo (Fase 9). Ausente en un backend anterior: se usan los colores de globals.css. */
+  theme?: PublicTheme | null;
+};
+
+export type PublicTheme = {
+  code: string;
+  light: Record<string, string>;
+  dark: Record<string, string>;
+  font_display: "brand" | "serif" | "system";
+  radius_sm: number;
+  radius: number;
+  uppercase_headings: boolean;
 };
 
 export type Image = { path: string; alt: string; width: number | null; height: number | null };
@@ -103,6 +115,38 @@ export type HomeData = {
   newest: ProductCard[];
   on_sale: ProductCard[];
   brands: BrandCard[];
+  /** Portada armada en el panel (Fase 9); null = portada fija. */
+  page?: CmsPage | null;
+};
+
+/* ---------- Contenido (Fase 9) ---------- */
+
+export type MenuLink = { label: string; href: string; children: MenuLink[] };
+export type Menus = { header: MenuLink[]; footer: MenuLink[] };
+
+type Cta = { button_label: string | null };
+export type CmsBlock =
+  | { id: string; type: "hero"; data: Cta & { title: string; subtitle: string | null; button_link: string | null; style: "field" | "image" | "split" | null; image: Image | null; products: ProductCard[] } }
+  | { id: string; type: "banner"; data: Cta & { title: string | null; text: string | null; link: string | null; image: Image } }
+  | { id: string; type: "image_text"; data: Cta & { title: string | null; html: string; link: string | null; image_side: "left" | "right" | null; image: Image | null } }
+  | { id: string; type: "rich_text"; data: { title: string | null; html: string } }
+  | { id: string; type: "products"; data: { title: string | null; layout: "carousel" | "grid" | null; link_label: string | null; link: string | null; products: ProductCard[] } }
+  | { id: string; type: "categories"; data: { title: string | null; categories: HomeData["categories"] } }
+  | { id: string; type: "brands"; data: { title: string | null; brands: { name: string; slug: string; logo: Image | null }[] } }
+  | { id: string; type: "marquee"; data: { items: { text: string; link?: string | null }[] } }
+  | { id: string; type: "countdown"; data: Cta & { title: string; text: string | null; ends_at: string; link: string | null } }
+  | { id: string; type: "testimonials"; data: { title: string | null; items: { name: string; text: string; rating?: number | null }[] } }
+  | { id: string; type: "faq"; data: { title: string | null; items: { question: string; html: string }[] } }
+  | { id: string; type: "video"; data: { title: string | null; provider: "youtube" | "vimeo"; id: string; embed: string } };
+
+export type CmsPage = {
+  title: string;
+  slug: string;
+  type: "home" | "landing" | "institutional";
+  seo: { title: string; description: string | null };
+  version: number;
+  blocks: CmsBlock[];
+  preview?: boolean;
 };
 
 /* ---------- Carrito, checkout, pedidos y cuenta (Fase 5) ---------- */

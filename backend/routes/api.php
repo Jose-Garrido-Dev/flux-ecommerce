@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Storefront\V1\AuthController;
 use App\Http\Controllers\Api\Storefront\V1\CartController;
 use App\Http\Controllers\Api\Storefront\V1\CatalogController;
 use App\Http\Controllers\Api\Storefront\V1\CheckoutController;
+use App\Http\Controllers\Api\Storefront\V1\ContentController;
 use App\Http\Controllers\Api\Storefront\V1\GeoController;
 use App\Http\Controllers\Api\Storefront\V1\MeController;
 use App\Http\Controllers\Api\Storefront\V1\OrderTrackingController;
@@ -25,6 +26,9 @@ Route::match(['get', 'post'], '/pagos/{gateway}/retorno', PaymentReturnControlle
 Route::prefix('storefront/v1')->middleware('throttle:storefront')->group(function () {
     Route::get('/store', [StoreController::class, 'show']);
     Route::get('/home', [CatalogController::class, 'home']);
+    Route::get('/menus', [ContentController::class, 'menus']);
+    Route::get('/pages/{slug}', [ContentController::class, 'page'])->where('slug', '[a-z0-9-]{1,160}');
+    Route::get('/preview/{token}', [ContentController::class, 'preview'])->where('token', '[A-Za-z0-9_.-]{20,400}')->middleware('throttle:30,1');
 
     Route::prefix('catalog')->group(function () {
         Route::get('/products', [CatalogController::class, 'products']);

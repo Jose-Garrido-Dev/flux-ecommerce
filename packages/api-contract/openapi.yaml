@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Flux Storefront API
-  version: 0.9.0
+  version: 0.10.0
   description: >
     Contrato entre el backend Laravel y el storefront Next.js.
     Todo endpoint nuevo se agrega aquí antes de implementarse.
@@ -67,6 +67,73 @@ paths:
                       newest: { type: array, items: { $ref: "#/components/schemas/ProductCard" } }
                       on_sale: { type: array, items: { $ref: "#/components/schemas/ProductCard" }, description: Productos con una oferta vigente }
                       brands: { type: array, items: { $ref: "#/components/schemas/BrandCard" } }
+                      page:
+                        description: Portada publicada en el panel (Fase 9). null = la tienda usa la portada fija
+                        oneOf:
+                          - $ref: "#/components/schemas/CmsPage"
+                          - type: "null"
+  /storefront/v1/menus:
+    get:
+      summary: Menús del encabezado y del pie
+      description: Los enlaces a categorías, marcas o páginas que no están visibles se omiten. El encabezado admite un nivel de submenú.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      header: { type: array, items: { $ref: "#/components/schemas/MenuLink" } }
+                      footer: { type: array, items: { $ref: "#/components/schemas/MenuLink" } }
+  /storefront/v1/pages/{slug}:
+    get:
+      summary: Página publicada (landing o institucional)
+      description: La portada no se sirve por esta ruta; viene en /home.
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string, pattern: "^[a-z0-9-]{1,160}$" } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/CmsPage" }
+        "404":
+          description: No existe o no está publicada
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /storefront/v1/preview/{token}:
+    get:
+      summary: Vista previa de una versión en borrador
+      description: El token lo genera el panel, va firmado con la clave de la aplicación y vence en 2 horas. Respuesta con Cache-Control no-store. Límite de 30 solicitudes por minuto.
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/CmsPage"
+                      - type: object
+                        properties:
+                          preview: { type: boolean, const: true }
+        "404":
+          description: Token inválido, alterado o vencido
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
   /storefront/v1/catalog/products:
     get:
       summary: Listado de productos publicados con filtros, orden y facetas
@@ -632,6 +699,52 @@ components:
             instagram: { type: string, format: uri }
             facebook: { type: string, format: uri }
             tiktok: { type: string, format: uri }
+        theme:
+          description: Tema activo (Fase 9)
+          oneOf:
+            - $ref: "#/components/schemas/PublicTheme"
+            - type: "null"
+    PublicTheme:
+      type: object
+      properties:
+        code: { type: string, enum: [lapislazuli, minimalista, fashion, streetwear, tecnologia, lujo, hogar] }
+        light: { type: object, additionalProperties: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }, description: "Colores del modo claro (bg, surface, fg, accent, field, ink…)" }
+        dark: { type: object, additionalProperties: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }, description: Colores del modo oscuro }
+        font_display: { type: string, enum: [brand, serif, system] }
+        radius_sm: { type: integer, minimum: 0, maximum: 24 }
+        radius: { type: integer, minimum: 0, maximum: 32 }
+        uppercase_headings: { type: boolean }
+    MenuLink:
+      type: object
+      properties:
+        label: { type: string }
+        href: { type: string, description: "Ruta de la tienda (/categoria/ropa) o URL https" }
+        children: { type: array, items: { $ref: "#/components/schemas/MenuLink" } }
+    CmsPage:
+      type: object
+      properties:
+        title: { type: string }
+        slug: { type: string }
+        type: { type: string, enum: [home, landing, institutional] }
+        seo:
+          type: object
+          properties:
+            title: { type: string }
+            description: { type: [string, "null"] }
+        version: { type: integer }
+        blocks: { type: array, items: { $ref: "#/components/schemas/CmsBlock" } }
+    CmsBlock:
+      type: object
+      description: >-
+        Bloque ya resuelto para mostrar. type es uno de hero, banner, image_text, rich_text, products, categories,
+        brands, marquee, countdown, testimonials, faq, video. Los campos de data de cada tipo están en
+        backend/resources/cms/blocks.json; las imágenes llegan como Image, los productos como ProductCard y el
+        texto con formato como html seguro (el HTML escrito a mano llega escapado). Los bloques sin contenido
+        visible (sin productos, cuenta regresiva vencida) no se envían.
+      properties:
+        id: { type: string, example: hero-1 }
+        type: { type: string }
+        data: { type: object }
     Problem:
       type: object
       description: RFC 9457 (application/problem+json)

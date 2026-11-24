@@ -1,0 +1,144 @@
+{
+  "$comment": "Esquema de los bloques del constructor de páginas. Archivo compartido: storefront/src/lib/cms-blocks.json debe ser idéntico (lo comprueba una prueba). Laravel valida cada bloque con este esquema antes de guardar y el panel arma sus formularios desde aquí.",
+  "version": 1,
+  "blocks": {
+    "hero": {
+      "label": "Portada (hero)",
+      "description": "Titular grande con imagen o campo de color y un botón.",
+      "icon": "heroicon-o-sparkles",
+      "fields": {
+        "title": { "type": "text", "label": "Titular", "required": true, "max": 120 },
+        "subtitle": { "type": "textarea", "label": "Bajada", "max": 300 },
+        "image": { "type": "media", "label": "Imagen" },
+        "button_label": { "type": "text", "label": "Texto del botón", "max": 40 },
+        "button_link": { "type": "link", "label": "Enlace del botón" },
+        "style": { "type": "select", "label": "Estilo", "options": { "field": "Campo de color con productos", "image": "Imagen a pantalla completa", "split": "Imagen al lado del texto" }, "default": "field" }
+      }
+    },
+    "banner": {
+      "label": "Banner",
+      "description": "Imagen ancha con texto encima y enlace opcional.",
+      "icon": "heroicon-o-photo",
+      "fields": {
+        "image": { "type": "media", "label": "Imagen", "required": true },
+        "title": { "type": "text", "label": "Título", "max": 120 },
+        "text": { "type": "textarea", "label": "Texto", "max": 300 },
+        "button_label": { "type": "text", "label": "Texto del botón", "max": 40 },
+        "link": { "type": "link", "label": "Enlace" }
+      }
+    },
+    "image_text": {
+      "label": "Imagen y texto",
+      "description": "Imagen a un lado y texto con formato al otro.",
+      "icon": "heroicon-o-newspaper",
+      "fields": {
+        "image": { "type": "media", "label": "Imagen", "required": true },
+        "title": { "type": "text", "label": "Título", "required": true, "max": 120 },
+        "text": { "type": "markdown", "label": "Texto", "max": 3000 },
+        "button_label": { "type": "text", "label": "Texto del botón", "max": 40 },
+        "link": { "type": "link", "label": "Enlace" },
+        "image_side": { "type": "select", "label": "Imagen a la", "options": { "left": "Izquierda", "right": "Derecha" }, "default": "left" }
+      }
+    },
+    "rich_text": {
+      "label": "Texto",
+      "description": "Texto con títulos, listas, negritas y enlaces.",
+      "icon": "heroicon-o-document-text",
+      "fields": {
+        "title": { "type": "text", "label": "Título", "max": 120 },
+        "body": { "type": "markdown", "label": "Contenido", "required": true, "max": 20000 }
+      }
+    },
+    "products": {
+      "label": "Productos",
+      "description": "Carrusel o grilla de productos: destacados, nuevos, en oferta, de una categoría o marca, o elegidos a mano.",
+      "icon": "heroicon-o-shopping-bag",
+      "fields": {
+        "title": { "type": "text", "label": "Título", "max": 120 },
+        "source": { "type": "select", "label": "Qué productos", "required": true, "options": { "featured": "Destacados", "newest": "Más nuevos", "on_sale": "En oferta", "category": "De una categoría", "brand": "De una marca", "manual": "Elegidos a mano" }, "default": "featured" },
+        "category": { "type": "category", "label": "Categoría", "required_if": { "source": "category" } },
+        "brand": { "type": "brand", "label": "Marca", "required_if": { "source": "brand" } },
+        "product_ids": { "type": "products", "label": "Productos", "max_items": 24, "required_if": { "source": "manual" } },
+        "limit": { "type": "number", "label": "Cantidad", "min": 1, "max": 24, "default": 8 },
+        "layout": { "type": "select", "label": "Formato", "options": { "carousel": "Carrusel", "grid": "Grilla" }, "default": "carousel" },
+        "link_label": { "type": "text", "label": "Texto del enlace \"ver todo\"", "max": 40 },
+        "link": { "type": "link", "label": "Enlace \"ver todo\"" }
+      }
+    },
+    "categories": {
+      "label": "Categorías",
+      "description": "Mosaico de categorías con imagen. Vacío = las marcadas para la portada.",
+      "icon": "heroicon-o-squares-2x2",
+      "fields": {
+        "title": { "type": "text", "label": "Título", "max": 120 },
+        "category_ids": { "type": "categories", "label": "Categorías", "max_items": 12 }
+      }
+    },
+    "brands": {
+      "label": "Marcas",
+      "description": "Logos de marcas. Vacío = las marcadas para la portada.",
+      "icon": "heroicon-o-tag",
+      "fields": {
+        "title": { "type": "text", "label": "Título", "max": 120 },
+        "brand_ids": { "type": "brands", "label": "Marcas", "max_items": 24 }
+      }
+    },
+    "marquee": {
+      "label": "Cinta en movimiento",
+      "description": "Frases cortas que corren de lado a lado.",
+      "icon": "heroicon-o-arrows-right-left",
+      "fields": {
+        "items": { "type": "list", "label": "Frases", "required": true, "max_items": 12, "fields": {
+          "text": { "type": "text", "label": "Frase", "required": true, "max": 60 },
+          "link": { "type": "link", "label": "Enlace" }
+        } }
+      }
+    },
+    "countdown": {
+      "label": "Cuenta regresiva",
+      "description": "Temporizador hasta una fecha. Se oculta solo cuando termina.",
+      "icon": "heroicon-o-clock",
+      "fields": {
+        "title": { "type": "text", "label": "Título", "required": true, "max": 120 },
+        "text": { "type": "textarea", "label": "Texto", "max": 300 },
+        "ends_at": { "type": "datetime", "label": "Termina", "required": true },
+        "button_label": { "type": "text", "label": "Texto del botón", "max": 40 },
+        "link": { "type": "link", "label": "Enlace" }
+      }
+    },
+    "testimonials": {
+      "label": "Testimonios",
+      "description": "Opiniones de clientes reales. No inventes testimonios.",
+      "icon": "heroicon-o-chat-bubble-left-right",
+      "fields": {
+        "title": { "type": "text", "label": "Título", "max": 120 },
+        "items": { "type": "list", "label": "Testimonios", "required": true, "max_items": 12, "fields": {
+          "name": { "type": "text", "label": "Nombre", "required": true, "max": 80 },
+          "text": { "type": "textarea", "label": "Testimonio", "required": true, "max": 500 },
+          "rating": { "type": "number", "label": "Estrellas", "min": 1, "max": 5 }
+        } }
+      }
+    },
+    "faq": {
+      "label": "Preguntas frecuentes",
+      "description": "Preguntas que se abren al hacer clic.",
+      "icon": "heroicon-o-question-mark-circle",
+      "fields": {
+        "title": { "type": "text", "label": "Título", "max": 120 },
+        "items": { "type": "list", "label": "Preguntas", "required": true, "max_items": 40, "fields": {
+          "question": { "type": "text", "label": "Pregunta", "required": true, "max": 200 },
+          "answer": { "type": "markdown", "label": "Respuesta", "required": true, "max": 3000 }
+        } }
+      }
+    },
+    "video": {
+      "label": "Video",
+      "description": "Video de YouTube o Vimeo. YouTube se inserta en modo de privacidad mejorada.",
+      "icon": "heroicon-o-play-circle",
+      "fields": {
+        "title": { "type": "text", "label": "Título", "max": 120 },
+        "url": { "type": "video", "label": "Enlace del video", "required": true }
+      }
+    }
+  }
+}

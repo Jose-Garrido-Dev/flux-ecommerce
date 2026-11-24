@@ -2,8 +2,10 @@
 
 namespace App\Domain\Catalog\Models;
 
+use App\Domain\Content\Models\MediaFolder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 
 /** Archivo subido (imagen, documento). Se guarda en el disco del servidor por defecto. */
@@ -13,7 +15,7 @@ class Media extends Model
 
     protected $table = 'media';
 
-    protected $fillable = ['disk', 'path', 'original_name', 'mime', 'size', 'width', 'height', 'alt', 'title', 'checksum', 'variants', 'uploaded_by'];
+    protected $fillable = ['folder_id', 'disk', 'path', 'original_name', 'mime', 'size', 'width', 'height', 'alt', 'title', 'checksum', 'variants', 'uploaded_by'];
 
     public function uniqueIds(): array
     {
@@ -23,6 +25,11 @@ class Media extends Model
     protected function casts(): array
     {
         return ['size' => 'integer', 'width' => 'integer', 'height' => 'integer', 'variants' => 'array'];
+    }
+
+    public function folder(): BelongsTo
+    {
+        return $this->belongsTo(MediaFolder::class, 'folder_id');
     }
 
     public function url(): string

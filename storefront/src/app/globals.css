@@ -3,8 +3,8 @@
 /*
  * Design system Flux — tokens.
  * Los componentes solo usan estas variables: cambiar de tema = cambiar tokens
- * (en la Fase 9 Laravel los entrega por tema desde /settings/theme).
- * Tema activo: Lapislázuli (campo de color azul, tipografía angosta y pesada).
+ * (desde la Fase 9 el layout inserta las variables del tema activo que entrega /store).
+ * Estos valores son el tema por defecto, Lapislázuli, y el respaldo si la API no responde.
  */
 :root {
   /* Color. Paleta "Lapislázuli": la piedra nacional de Chile como color de marca,
@@ -34,6 +34,10 @@
   /* Tipografía: una sola familia variable (peso y ancho), alojada en el propio servidor */
   --font-sans: var(--font-brand), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-display: var(--font-sans);
+  /* Titulares: los temas cambian familia, ancho, peso y mayúsculas */
+  --display-stretch: 78%;
+  --display-weight: 750;
+  --display-transform: none;
 
   /* Forma: fotos con esquinas casi rectas, botones en píldora */
   --radius-sm: 4px;
@@ -108,8 +112,10 @@ body {
 
 /* Titulares: la misma familia, angosta y pesada. El tipo es el elemento gráfico principal. */
 .font-display {
-  font-stretch: 78%;
-  font-weight: 750;
+  font-family: var(--font-display);
+  font-stretch: var(--display-stretch);
+  font-weight: var(--display-weight);
+  text-transform: var(--display-transform);
   letter-spacing: -0.025em;
   line-height: 0.92;
 }
@@ -138,6 +144,11 @@ body {
 .prose-flux ul { list-style: disc; padding-left: 1.2em; margin: 0 0 0.9em; }
 .prose-flux ol { list-style: decimal; padding-left: 1.2em; margin: 0 0 0.9em; }
 .prose-flux h3, .prose-flux h4 { font-weight: 600; margin: 1.2em 0 0.4em; }
+.prose-flux h1, .prose-flux h2 { font-size: 1.5em; font-weight: 650; margin: 1.4em 0 0.5em; line-height: 1.15; }
+.prose-flux a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; }
+.prose-flux blockquote { border-left: 3px solid var(--color-border); padding-left: 1em; color: var(--color-muted); margin: 0 0 0.9em; }
+.prose-flux strong { font-weight: 650; }
+.prose-flux > :last-child { margin-bottom: 0; }
 
 
 /* ---------- Movimiento ---------- */

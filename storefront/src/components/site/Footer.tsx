@@ -1,17 +1,19 @@
 import Link from "next/link";
-import type { CategoryNode, PublicStore } from "@/lib/types";
+import type { CategoryNode, MenuLink, PublicStore } from "@/lib/types";
+import { CmsLink } from "@/components/cms/CmsLink";
 import { Container } from "@/components/ui/Container";
 
 const SOCIAL_LABEL = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok" } as const;
 
-export function Footer({ store, menu }: { store: PublicStore | null; menu: CategoryNode[] }) {
+/** Pie: categorías, enlaces del menú del pie armado en el panel (Contenido → Menús) y contacto. */
+export function Footer({ store, menu, links = [] }: { store: PublicStore | null; menu: CategoryNode[]; links?: MenuLink[] }) {
   const year = new Date().getFullYear();
   const name = store?.name ?? "Tienda";
   const social = Object.entries(store?.social ?? {}) as [keyof typeof SOCIAL_LABEL, string][];
 
   return (
     <footer className="relative mt-32 overflow-hidden bg-ink text-ink-fg">
-      <Container className="relative grid gap-12 pb-12 pt-20 md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr]">
+      <Container className="relative grid gap-12 pb-12 pt-20 md:grid-cols-2 lg:grid-cols-[1.6fr_repeat(3,1fr)]">
         <div>
           <p className="font-display text-5xl leading-none sm:text-6xl">{name}</p>
           {store?.tagline && <p className="mt-5 max-w-sm text-ink-muted">{store.tagline}</p>}
@@ -26,6 +28,18 @@ export function Footer({ store, menu }: { store: PublicStore | null; menu: Categ
               {menu.map((c) => (
                 <li key={c.slug}>
                   <Link href={`/categoria/${c.slug}`} className="hover:underline underline-offset-4">{c.name}</Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
+        {links.length > 0 && (
+          <nav aria-label="Información">
+            <p className="text-sm font-semibold text-ink-muted">Información</p>
+            <ul className="mt-5 space-y-3">
+              {links.map((l, i) => (
+                <li key={i}>
+                  <CmsLink href={l.href} className="hover:underline underline-offset-4">{l.label}</CmsLink>
                 </li>
               ))}
             </ul>

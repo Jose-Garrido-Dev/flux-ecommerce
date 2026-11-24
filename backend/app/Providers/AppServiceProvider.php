@@ -6,7 +6,11 @@ use App\Domain\Catalog\Models\Attribute;
 use App\Domain\Catalog\Models\Brand;
 use App\Domain\Catalog\Models\CatalogImport;
 use App\Domain\Catalog\Models\Category;
+use App\Domain\Catalog\Models\Media;
 use App\Domain\Catalog\Models\Product;
+use App\Domain\Content\Models\MediaFolder;
+use App\Domain\Content\Models\Menu;
+use App\Domain\Content\Models\Page;
 use App\Domain\Customers\Models\Customer;
 use App\Domain\Inventory\Models\InventoryLevel;
 use App\Domain\Inventory\Models\StockMovement;
@@ -36,8 +40,11 @@ use App\Policies\CategoryPolicy;
 use App\Policies\CustomerPolicy;
 use App\Policies\EmailPolicy;
 use App\Policies\InventoryPolicy;
+use App\Policies\MediaPolicy;
+use App\Policies\MenuPolicy;
 use App\Policies\ModuleStatusPolicy;
 use App\Policies\OrderPolicy;
+use App\Policies\PagePolicy;
 use App\Policies\ProductPolicy;
 use App\Policies\RegionPolicy;
 use App\Policies\ReturnPolicy;
@@ -105,6 +112,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(ReturnRequest::class, ReturnPolicy::class);
         Gate::policy(EmailTemplate::class, EmailPolicy::class);
         Gate::policy(EmailLog::class, EmailPolicy::class);
+        Gate::policy(Page::class, PagePolicy::class);
+        Gate::policy(Menu::class, MenuPolicy::class);
+        Gate::policy(Media::class, MediaPolicy::class);
+        Gate::policy(MediaFolder::class, MediaPolicy::class);
 
         // El superadministrador técnico tiene todos los permisos
         Gate::before(fn ($user) => $user->hasRole('super-admin') ? true : null);

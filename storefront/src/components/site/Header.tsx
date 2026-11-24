@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { CategoryNode } from "@/lib/types";
+import type { CategoryNode, MenuLink } from "@/lib/types";
+import { CmsLink } from "@/components/cms/CmsLink";
 import { mediaUrl } from "@/lib/format";
 import { Container } from "@/components/ui/Container";
 import { SearchForm } from "./SearchForm";
@@ -11,8 +12,10 @@ const iconBtn = "flex h-10 w-10 items-center justify-center rounded-full transit
 /**
  * Encabezado sin JavaScript: el mega menú de escritorio se abre con hover/foco
  * (CSS) y el menú móvil es un <details>, accesible por teclado y lector de pantalla.
+ * Si en el panel se armó el menú del encabezado (Contenido → Menús), se usa ese; si no, las categorías.
  */
-export function Header({ storeName, menu }: { storeName: string; menu: CategoryNode[] }) {
+export function Header({ storeName, menu, links = [] }: { storeName: string; menu: CategoryNode[]; links?: MenuLink[] }) {
+  const custom = links.length > 0;
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-bg/85 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/70">
       <a
@@ -34,6 +37,28 @@ export function Header({ storeName, menu }: { storeName: string; menu: CategoryN
           </summary>
           <nav aria-label="Categorías" className="fixed inset-x-0 top-[4.25rem] h-[calc(100dvh-4.25rem)] overflow-y-auto bg-bg px-5 pb-10 pt-6">
             <SearchForm id="q-movil" className="mb-8" />
+            {custom ? (
+              <ul className="divide-y divide-border">
+                {links.map((l, i) => (
+                  <li key={i} className="py-4">
+                    <CmsLink href={l.href} className="flex items-center justify-between font-display text-3xl">
+                      {l.label}
+                    </CmsLink>
+                    {l.children.length > 0 && (
+                      <ul className="mt-3 flex flex-wrap gap-2">
+                        {l.children.map((s, j) => (
+                          <li key={j}>
+                            <CmsLink href={s.href} className="inline-block rounded-full border border-border px-3 py-1.5 text-sm">
+                              {s.label}
+                            </CmsLink>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
             <ul className="divide-y divide-border">
               <li>
                 <Link href="/catalogo" className="flex items-center justify-between py-4 font-display text-3xl">
@@ -59,6 +84,7 @@ export function Header({ storeName, menu }: { storeName: string; menu: CategoryN
                 </li>
               ))}
             </ul>
+            )}
           </nav>
         </details>
 
@@ -67,6 +93,33 @@ export function Header({ storeName, menu }: { storeName: string; menu: CategoryN
         </Link>
 
         <nav aria-label="Categorías principales" className="hidden h-full flex-1 lg:block">
+          {custom ? (
+            <ul className="flex h-full items-center gap-1">
+              {links.map((l, i) => (
+                <li key={i} className="group/item relative flex h-full items-center">
+                  <CmsLink href={l.href} className="flex items-center gap-1 rounded-full px-4 py-2 text-sm font-medium transition-colors hover:bg-subtle">
+                    {l.label}
+                    {l.children.length > 0 && (
+                      <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="transition-transform group-hover/item:rotate-180">
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    )}
+                  </CmsLink>
+                  {l.children.length > 0 && (
+                    <ul className="invisible absolute left-0 top-full min-w-56 -translate-y-2 rounded-[var(--radius)] border border-border bg-bg p-2 opacity-0 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.25)] transition-all duration-[var(--motion)] ease-[var(--ease-out)] group-focus-within/item:visible group-focus-within/item:translate-y-0 group-focus-within/item:opacity-100 group-hover/item:visible group-hover/item:translate-y-0 group-hover/item:opacity-100">
+                      {l.children.map((s, j) => (
+                        <li key={j}>
+                          <CmsLink href={s.href} className="block rounded-[var(--radius-sm)] px-3 py-2 text-sm transition-colors hover:bg-subtle">
+                            {s.label}
+                          </CmsLink>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
           <ul className="flex h-full items-center gap-1">
             <li>
               <Link href="/catalogo" className="rounded-full px-4 py-2 text-sm font-medium transition-colors hover:bg-subtle">
@@ -135,6 +188,7 @@ export function Header({ storeName, menu }: { storeName: string; menu: CategoryN
               </li>
             ))}
           </ul>
+          )}
         </nav>
 
         <div className="ml-auto hidden w-64 xl:block">

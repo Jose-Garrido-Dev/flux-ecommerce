@@ -22,6 +22,8 @@ type FetchOptions = {
   tags?: string[];
   /** Segundos de caché; false = sin caché (stock, precios, checkout) */
   revalidate?: number | false;
+  /** Nunca guardar en caché (vista previa de borradores) */
+  noStore?: boolean;
 };
 
 /** Devuelve el cuerpo completo de la respuesta (data, meta, facets...). */
@@ -32,7 +34,7 @@ export async function apiFetch<T>(path: string, opts: FetchOptions = {}): Promis
       // Identifica al servidor de la tienda para que Laravel no lo limite como a un visitante
       "X-Flux-Storefront-Key": process.env.REVALIDATE_SECRET ?? "",
     },
-    next: { tags: opts.tags, revalidate: opts.revalidate ?? 300 },
+    ...(opts.noStore ? { cache: "no-store" as const } : { next: { tags: opts.tags, revalidate: opts.revalidate ?? 300 } }),
     signal: AbortSignal.timeout(8000),
   });
 
