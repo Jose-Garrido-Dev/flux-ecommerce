@@ -72,6 +72,11 @@ class Order extends Model
         return $this->belongsTo(Customer::class);
     }
 
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(OrderAdjustment::class)->orderBy('id');
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class)->orderBy('id');

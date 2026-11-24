@@ -57,11 +57,47 @@ class CartController extends StorefrontController
         return $this->respond($this->carts->remove($cart, $sku));
     }
 
+    /** Aplica un cupón. Si no corresponde, responde 422 con el motivo y el carrito queda como estaba. */
+    public function applyCoupon(Request $request): JsonResponse
+    {
+        $data = $request->validate(['code' => ['required', 'string', 'max:40']], ['code.required' => 'Escribe el código del cupón.']);
+        $cart = $this->cart($request, $this->carts);
+        if (! $cart) {
+            return $this->problem(404, 'cart_not_found', 'El carrito no existe o ya se convirtió en un pedido.');
+        }
+        $customer = $this->customer($request);
+
+        return $this->respond($this->carts->applyCoupon($cart, $data['code'], $customer?->email, $customer?->id));
+    }
+
+    public function removeCoupon(Request $request): JsonResponse
+    {
+        $cart = $this->cart($request, $this->carts);
+        if (! $cart) {
+            return $this->problem(404, 'cart_not_found', 'El carrito no existe o ya se convirtió en un pedido.');
+        }
+
+        return $this->respond($this->carts->removeCoupon($cart));
+    }
+
     private function respond(?Cart $cart, ?string $token = null, int $status = 200): JsonResponse
     {
-        $summary = $cart ? $this->carts->summary($cart) : ['items' => [], 'count' => 0, 'subtotal' => 0, 'tax_total' => 0, 'warnings' => []];
-        $summary['items'] = array_map(fn ($l) => array_diff_key($l, array_flip(['unit_cost', 'variant_id', 'tax_rate_bp'])), $summary['items']);
+        return response()->json(['data' => [...self::publicSummary($cart ? $this->carts->summary($cart) : null), 'currency' => 'CLP'], 'token' => $token], $status);
+    }
 
-        return response()->json(['data' => [...$summary, 'currency' => 'CLP'], 'token' => $token], $status);
+    /** Lo que ve la tienda del resumen: sin costos ni ids internos. */
+    public static function publicSummary(?array $summary): array
+    {
+        $summary ??= [
+            'items' => [], 'count' => 0, 'subtotal' => 0, 'discount_total' => 0, 'total' => 0, 'tax_total' => 0, 'warnings' => [],
+            'discounts' => ['coupon' => null, 'coupon_error' => null, 'promotions' => [], 'free_shipping' => false],
+        ];
+        $summary['items'] = array_map(fn ($l) => array_diff_key($l, array_flip(['unit_cost', 'variant_id', 'tax_rate_bp', 'product_id', 'brand_id', 'category_ids'])), $summary['items']);
+        if ($summary['discounts']['coupon'] ?? null) {
+            unset($summary['discounts']['coupon']['id']);
+        }
+        $summary['discounts']['promotions'] = array_map(fn ($p) => ['name' => $p['name'], 'amount' => $p['amount']], $summary['discounts']['promotions'] ?? []);
+
+        return $summary;
     }
 }

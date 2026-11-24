@@ -4,6 +4,8 @@ namespace Tests\Feature\Notifications;
 
 use App\Domain\Customers\Mail\CustomerMail;
 use App\Domain\Customers\Models\Customer;
+use App\Domain\Marketing\Mail\NewsletterConfirmMail;
+use App\Domain\Marketing\Models\NewsletterSubscriber;
 use App\Domain\Notifications\Models\EmailLog;
 use App\Domain\Notifications\Models\EmailTemplate;
 use App\Domain\Notifications\Services\EmailResender;
@@ -33,7 +35,7 @@ use Tests\Feature\Checkout\CheckoutFixtures;
 use Tests\Feature\Language\SpanishOnlyAdminTest;
 use Tests\TestCase;
 
-/** Fase 8: las 16 plantillas (todas en español) se envían de verdad (mailer array), quedan en el historial, se pueden desactivar, reintentar y reenviar. */
+/** Fase 8: las 17 plantillas (todas en español) se envían de verdad (mailer array), quedan en el historial, se pueden desactivar, reintentar y reenviar. */
 class EmailDeliveryTest extends TestCase
 {
     use CheckoutFixtures, RefreshDatabase;
@@ -88,6 +90,10 @@ class EmailDeliveryTest extends TestCase
             'return_new_admin' => new ReturnMail($order, $return, 'new_admin'),
             'customer_verify' => new CustomerMail($customer, 'verify', 'https://tienda.test/cuenta/verificar'),
             'customer_reset' => new CustomerMail($customer, 'reset', 'https://tienda.test/cuenta/restablecer'),
+            'newsletter_confirm' => new NewsletterConfirmMail(
+                NewsletterSubscriber::query()->create(['email' => 'luis@correo.cl', 'name' => 'Luis', 'source' => 'footer']),
+                'https://tienda.test/newsletter/confirmar?token=abc',
+            ),
         ];
     }
 
@@ -97,13 +103,13 @@ class EmailDeliveryTest extends TestCase
         EmailTemplate::query()->where('key', 'payment_confirmed')->update(['subject' => 'Pago listo, {nombre} — pedido #{pedido}', 'intro' => 'Gracias **{nombre}**.']);
         $mails = $this->mailables();
         $this->assertSame(array_keys(EmailTemplateRegistry::all()), array_keys($mails), 'Cada plantilla del registro tiene su correo');
-        $this->assertCount(16, $mails);
+        $this->assertCount(17, $mails);
 
         foreach ($mails as $mail) {
             Mail::to('ana@correo.cl')->queue($mail);
         }
 
-        $this->assertCount(16, $this->sent()->messages());
+        $this->assertCount(17, $this->sent()->messages());
         foreach ($this->sent()->messages() as $message) {
             $html = $message->getOriginalMessage()->getHtmlBody();
             $this->assertSame([], SpanishOnlyAdminTest::englishFragments($html), 'Correo en inglés: '.$message->getOriginalMessage()->getSubject());
@@ -208,6 +214,6 @@ class EmailDeliveryTest extends TestCase
         $template->update(['subject' => 'Otro asunto']);
         $template->restoreDefault();
         $this->assertSame($original, $template->fresh()->subject);
-        $this->assertSame(16, EmailTemplate::query()->count());
+        $this->assertSame(17, EmailTemplate::query()->count());
     }
 }

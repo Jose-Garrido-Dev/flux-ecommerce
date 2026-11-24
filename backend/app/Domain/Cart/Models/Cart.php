@@ -12,7 +12,7 @@ class Cart extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['customer_id', 'token_hash', 'email', 'currency', 'status', 'last_activity_at'];
+    protected $fillable = ['customer_id', 'token_hash', 'email', 'currency', 'coupon_code', 'status', 'last_activity_at'];
 
     protected $attributes = ['status' => 'active', 'currency' => 'CLP'];
 

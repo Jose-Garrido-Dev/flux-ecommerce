@@ -7,6 +7,9 @@ use App\Domain\Cart\Services\CartService;
 use App\Domain\Customers\Models\Consent;
 use App\Domain\Customers\Models\Customer;
 use App\Domain\Inventory\Services\InventoryService;
+use App\Domain\Marketing\Models\Coupon;
+use App\Domain\Marketing\Models\CouponRedemption;
+use App\Domain\Marketing\Services\DiscountEngine;
 use App\Domain\Orders\Mail\NewOrderNotificationMail;
 use App\Domain\Orders\Mail\OrderPlacedMail;
 use App\Domain\Orders\Models\Order;
@@ -35,6 +38,7 @@ class PlaceOrder
         private readonly InventoryService $inventory,
         private readonly RateEngine $shipping,
         private readonly PaymentSettings $payments,
+        private readonly DiscountEngine $discounts,
     ) {}
 
     /**
@@ -48,13 +52,19 @@ class PlaceOrder
             return $existing; // reintento del mismo envío: mismo pedido
         }
 
-        $summary = $this->carts->summary($cart);
+        $email = Customer::normalizeEmail($input['email']);
+        $summary = $this->carts->summary($cart, $email, $customer?->id);
         $lines = array_values(array_filter($summary['items'], fn ($l) => $l['purchasable']));
         if ($summary['items'] === []) {
             throw new CheckoutException('cart_empty', 'Tu carrito está vacío.', 422);
         }
         if (count($lines) !== count($summary['items'])) {
             throw new CheckoutException('cart_changed', 'Algunos productos de tu carrito ya no están disponibles. Revisa el carrito.', 409, $summary);
+        }
+
+        $discounts = $summary['discounts'];
+        if ($discounts['coupon_error'] !== null) {
+            throw new CheckoutException('coupon_invalid', $discounts['coupon_error'].' Quítalo del carrito para continuar.', 409, $summary);
         }
 
         $paymentMethod = (string) ($input['payment_method'] ?? '');
@@ -70,15 +80,22 @@ class PlaceOrder
         }
         // Mismo cálculo que vio el cliente en el checkout: zona, peso (real o volumétrico) y restricciones de los productos
         $commune = $needsAddress ? ($input['address']['commune'] ?? null) : null;
-        $result = $this->shipping->evaluate($method, $region?->id, $commune, array_sum(array_column($lines, 'line_total')), ShippingPackage::fromLines($lines));
+        // El envío gratis por monto se calcula sobre lo que paga el cliente (con descuentos)
+        $result = $this->shipping->evaluate($method, $region?->id, $commune, $summary['total'], ShippingPackage::fromLines($lines));
         if (! $result['available']) {
             throw new CheckoutException('shipping_unavailable', 'El método de envío elegido no está disponible para tu dirección o tus productos.', 422);
         }
 
         $subtotal = array_sum(array_column($lines, 'line_total'));
+        $discountTotal = $summary['discount_total'];
         $ship = $result['option'];
+        $shippingDiscount = 0;
+        if ($discounts['free_shipping'] && $ship['amount'] > 0) {
+            $shippingDiscount = $ship['amount'];
+            $ship = [...$ship, 'amount' => 0, 'tax_amount' => 0];
+        }
         $itemsTax = array_sum(array_column($lines, 'tax_amount'));
-        $grandTotal = $subtotal + $ship['amount'];
+        $grandTotal = $subtotal - $discountTotal + $ship['amount'];
 
         // El total que vio el cliente solo sirve para avisarle si algo cambió; nunca se usa para cobrar
         if (isset($input['expected_total']) && (int) $input['expected_total'] !== $grandTotal) {
@@ -94,16 +111,26 @@ class PlaceOrder
         $minutes = $manual ? $this->payments->transferHours() * 60 : PaymentProcessor::GATEWAY_MINUTES;
 
         try {
-            $order = DB::transaction(function () use ($cart, $input, $customer, $idempotencyKey, $uuid, $token, $lines, $subtotal, $ship, $itemsTax, $grandTotal, $method, $region, $needsAddress, $minutes, $paymentMethod, $ip) {
+            $order = DB::transaction(function () use ($cart, $input, $customer, $idempotencyKey, $uuid, $token, $lines, $subtotal, $ship, $itemsTax, $grandTotal, $method, $region, $needsAddress, $minutes, $paymentMethod, $ip, $email, $discounts, $discountTotal, $shippingDiscount, $summary) {
+                // El cupón se bloquea mientras se crea el pedido: dos compras simultáneas no pueden pasar el límite de usos
+                $coupon = null;
+                if ($discounts['coupon'] !== null) {
+                    $coupon = Coupon::query()->with('targets')->whereKey($discounts['coupon']['id'])->lockForUpdate()->first();
+                    if ($error = $this->discounts->couponError($coupon, $lines, $subtotal, $email, $customer?->id)) {
+                        throw new CheckoutException('coupon_invalid', $error.' Quítalo del carrito para continuar.', 409, $summary);
+                    }
+                }
+
                 $order = new Order([
                     'idempotency_key' => $idempotencyKey,
                     'customer_id' => $customer?->id,
                     'cart_id' => $cart->id,
-                    'email' => Customer::normalizeEmail($input['email']),
+                    'email' => $email,
                     'phone' => $input['phone'],
                     'first_name' => $input['first_name'],
                     'last_name' => $input['last_name'],
                     'subtotal' => $subtotal,
+                    'discount_total' => $discountTotal,
                     'tax_total' => $itemsTax + $ship['tax_amount'],
                     'shipping_total' => $ship['amount'],
                     'grand_total' => $grandTotal,
@@ -130,6 +157,7 @@ class PlaceOrder
                         'unit_price' => $line['unit_price'],
                         'compare_at_price' => $line['compare_at'],
                         'unit_cost' => $line['unit_cost'],
+                        'discount_amount' => $line['discount'],
                         'tax_rate_bp' => $line['tax_rate_bp'],
                         'tax_amount' => $line['tax_amount'],
                         'line_total' => $line['line_total'],
@@ -144,6 +172,19 @@ class PlaceOrder
                     'carrier_code' => $ship['carrier_code'], 'zone_id' => $ship['zone_id'], 'zone_name' => $ship['zone_name'],
                     'chargeable_weight_g' => $ship['chargeable_weight_g'], 'pickup_address' => $ship['pickup_address'],
                 ]);
+                foreach ($discounts['promotions'] as $promotion) {
+                    $order->adjustments()->create(['source' => 'promotion', 'source_id' => $promotion['id'], 'label' => $promotion['name'], 'amount' => $promotion['amount']]);
+                }
+                if ($coupon) {
+                    $couponAmount = $discounts['coupon']['amount'] + $shippingDiscount;
+                    $order->adjustments()->create([
+                        'source' => 'coupon', 'source_id' => $coupon->id, 'label' => 'Cupón '.$coupon->code,
+                        'target' => $coupon->type === 'free_shipping' ? 'shipping' : 'items', 'amount' => $couponAmount,
+                    ]);
+                    CouponRedemption::query()->create([
+                        'coupon_id' => $coupon->id, 'order_id' => $order->id, 'customer_id' => $customer?->id, 'email' => $email, 'discount_amount' => $couponAmount,
+                    ]);
+                }
                 $order->payments()->create([
                     'method_code' => $paymentMethod, 'amount' => $grandTotal, 'expires_at' => now()->addMinutes($minutes),
                     'gateway_order' => $paymentMethod === 'bank_transfer' ? null : $order->number.'-1',
@@ -152,7 +193,7 @@ class PlaceOrder
                     'customer_id' => $customer?->id, 'email' => $order->email, 'purpose' => 'terms', 'granted' => true,
                     'source' => 'checkout', 'ip' => $ip, 'text_version' => (string) app(SettingsRepository::class)->get('legal', 'terms_version', '1'),
                 ]);
-                OrderEvents::record($order, 'placed', ['payment_method' => $paymentMethod], visible: true, to: 'pending', actor: $customer ? 'customer' : 'system');
+                OrderEvents::record($order, 'placed', array_filter(['payment_method' => $paymentMethod, 'coupon' => $coupon?->code]), visible: true, to: 'pending', actor: $customer ? 'customer' : 'system');
                 $cart->update(['status' => 'converted', 'email' => $order->email]);
                 app(AuditLogger::class)->record('Order.placed', $order, [], ['number' => $order->number, 'total' => $grandTotal]);
 

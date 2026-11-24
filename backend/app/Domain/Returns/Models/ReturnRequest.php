@@ -131,6 +131,6 @@ class ReturnRequest extends Model
     {
         $this->loadMissing('items.orderItem');
 
-        return (int) $this->items->sum(fn (ReturnItem $i) => $i->quantity * ($i->orderItem?->unit_price ?? 0));
+        return (int) $this->items->sum(fn (ReturnItem $i) => $i->orderItem?->paidFor($i->quantity) ?? 0);
     }
 }

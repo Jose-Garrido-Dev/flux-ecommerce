@@ -6,6 +6,7 @@ use App\Domain\Cart\Services\CartService;
 use App\Domain\Customers\Mail\CustomerMail;
 use App\Domain\Customers\Models\Consent;
 use App\Domain\Customers\Models\Customer;
+use App\Domain\Marketing\Services\NewsletterService;
 use App\Domain\Orders\Models\Order;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
@@ -49,6 +50,10 @@ class AuthController extends StorefrontController
             return $customer;
         });
         $this->sendVerification($customer);
+        if ($customer->marketing_opt_in) {
+            // Queda por confirmar: se confirma al verificar el correo de la cuenta
+            app(NewsletterService::class)->syncCustomer($customer, true, 'register', self::clientIp($request));
+        }
 
         return $this->loggedIn($request, $customer, $carts, 201);
     }
@@ -135,6 +140,7 @@ class AuthController extends StorefrontController
                 $customer->forceFill(['email_verified_at' => now()])->save();
                 Order::query()->whereNull('customer_id')->where('email', $customer->email)->update(['customer_id' => $customer->id]);
             });
+            app(NewsletterService::class)->customerVerified($customer->fresh());
         }
 
         return response()->json(['data' => ['message' => 'Tu correo quedó confirmado.']]);

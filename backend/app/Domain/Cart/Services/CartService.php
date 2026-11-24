@@ -8,6 +8,8 @@ use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductVariant;
 use App\Domain\Customers\Models\Customer;
 use App\Domain\Inventory\Services\InventoryService;
+use App\Domain\Marketing\Models\Coupon;
+use App\Domain\Marketing\Services\DiscountEngine;
 use App\Domain\Orders\Services\Tax;
 use App\Domain\Pricing\Models\TaxClass;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +26,7 @@ class CartService
 
     public const MAX_LINES = 100;
 
-    public function __construct(private readonly InventoryService $inventory) {}
+    public function __construct(private readonly InventoryService $inventory, private readonly DiscountEngine $discounts) {}
 
     /** Crea un carrito y devuelve [carrito, token]. El token solo se conoce aquí: se guarda su hash. */
     public function create(?Customer $customer = null): array
@@ -121,15 +123,38 @@ class CartService
         });
     }
 
+    /** Guarda el cupón en el carrito si aplica; si no, explica por qué (422). */
+    public function applyCoupon(Cart $cart, string $code, ?string $email = null, ?int $customerId = null): Cart
+    {
+        $code = Coupon::normalize($code);
+        $cart->coupon_code = $code;
+        $discounts = $this->summary($cart, $email, $customerId)['discounts'];
+        if ($discounts['coupon_error'] !== null) {
+            $cart->coupon_code = $cart->getOriginal('coupon_code');
+            throw ValidationException::withMessages(['code' => $discounts['coupon_error']]);
+        }
+        $cart->update(['coupon_code' => $code, 'last_activity_at' => now()]);
+
+        return $cart->fresh();
+    }
+
+    public function removeCoupon(Cart $cart): Cart
+    {
+        $cart->update(['coupon_code' => null, 'last_activity_at' => now()]);
+
+        return $cart->fresh();
+    }
+
     /**
-     * Resumen del carrito con precios y stock vigentes.
+     * Resumen del carrito con precios, stock y descuentos vigentes (promociones y cupón).
+     * Con el correo o el cliente se revisan también los límites por cliente y "solo primera compra".
      *
-     * @return array{items: list<array>, count: int, subtotal: int, tax_total: int, warnings: list<string>}
+     * @return array{items: list<array>, count: int, subtotal: int, discount_total: int, total: int, tax_total: int, discounts: array, warnings: list<string>}
      */
-    public function summary(Cart $cart): array
+    public function summary(Cart $cart, ?string $email = null, ?int $customerId = null): array
     {
         $cart->loadMissing(['items.variant' => fn ($q) => $q->with([
-            'product.taxClass', 'product.media', 'prices', 'attributeValues.attribute', 'image', 'inventoryItem', 'levels.warehouse',
+            'product.taxClass', 'product.media', 'product.categories:id', 'prices', 'attributeValues.attribute', 'image', 'inventoryItem', 'levels.warehouse',
         ])]);
         $defaultRate = $this->defaultRateBp();
 
@@ -148,13 +173,34 @@ class CartService
             }
             $items[] = $line;
         }
-        $valid = array_filter($items, fn ($l) => $l['purchasable']);
+        $validKeys = array_keys(array_filter($items, fn ($l) => $l['purchasable']));
+        $result = $this->discounts->calculate(
+            array_map(fn ($k) => $items[$k], $validKeys),
+            $cart->coupon_code,
+            $email ?? ($cart->customer_id ? $cart->email : null),
+            $customerId ?? $cart->customer_id,
+        );
+        foreach ($validKeys as $n => $k) {
+            $discount = $result['line_discounts'][$n] ?? 0;
+            $items[$k]['discount'] = $discount;
+            $items[$k]['tax_amount'] = Tax::included($items[$k]['line_total'] - $discount, $items[$k]['tax_rate_bp']);
+        }
+        $valid = array_map(fn ($k) => $items[$k], $validKeys);
+        $subtotal = array_sum(array_column($valid, 'line_total'));
 
         return [
             'items' => $items,
             'count' => array_sum(array_column($items, 'quantity')),
-            'subtotal' => array_sum(array_column($valid, 'line_total')),
+            'subtotal' => $subtotal,
+            'discount_total' => $result['items_discount'],
+            'total' => $subtotal - $result['items_discount'],
             'tax_total' => array_sum(array_column($valid, 'tax_amount')),
+            'discounts' => [
+                'coupon' => $result['coupon'],
+                'coupon_error' => $result['coupon_error'],
+                'promotions' => $result['promotions'],
+                'free_shipping' => $result['free_shipping'],
+            ],
             'warnings' => $warnings,
         ];
     }
@@ -188,8 +234,12 @@ class CartService
             'purchasable' => $purchasable,
             'max_quantity' => ($available === null || $backorder) ? null : max(0, min($available, self::MAX_QUANTITY)),
             'stock' => $this->inventory->stockStatus($variant),
+            'discount' => 0,
             'unit_cost' => $price?->cost_amount,
             'variant_id' => $variant->id,
+            'product_id' => $product->id,
+            'brand_id' => $product->brand_id,
+            'category_ids' => array_values(array_unique(array_filter([$product->primary_category_id, ...$product->categories->pluck('id')->all()]))),
         ];
     }
 

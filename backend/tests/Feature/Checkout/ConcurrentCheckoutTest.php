@@ -87,7 +87,7 @@ class ConcurrentCheckoutTest extends TestCase
             $this->assertSame(1, (int) $level->reserved, 'Nunca se reserva más de lo que hay');
             $this->assertSame(1, $setup->table('order_items')->count(), 'Los pedidos fallidos no dejan líneas');
         } finally {
-            $setup->statement('TRUNCATE email_logs, return_evidence, return_items, returns, shipping_incidents, shipment_events, shipment_items, shipments, payment_transactions, refunds, order_events, order_items, order_shipping_lines, payments, orders, consents, cart_items, carts, stock_movements, stock_reservations, audit_logs, jobs');
+            $setup->statement('TRUNCATE coupon_redemptions, order_adjustments, email_logs, return_evidence, return_items, returns, shipping_incidents, shipment_events, shipment_items, shipments, payment_transactions, refunds, order_events, order_items, order_shipping_lines, payments, orders, consents, cart_items, carts, stock_movements, stock_reservations, audit_logs, jobs');
             $setup->table('settings')->where('group', 'payments')->delete();
             $setup->table('shipping_methods')->where('id', $methodId)->delete();
             $setup->table('inventory_levels')->where('variant_id', $variantId)->delete();

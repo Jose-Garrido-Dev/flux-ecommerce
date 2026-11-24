@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Storefront\V1;
 use App\Domain\Customers\Models\Address;
 use App\Domain\Customers\Models\Consent;
 use App\Domain\Customers\Models\Customer;
+use App\Domain\Marketing\Services\NewsletterService;
 use App\Domain\Orders\Models\Order;
 use App\Domain\Orders\Services\OrderPayments;
 use App\Domain\Orders\Services\OrderPresenter;
@@ -56,7 +57,11 @@ class MeController extends StorefrontController
             if ($optIn !== $customer->marketing_opt_in) {
                 Consent::query()->create(['customer_id' => $customer->id, 'email' => $customer->email, 'purpose' => 'marketing', 'granted' => $optIn, 'source' => 'account', 'ip' => self::clientIp($request)]);
             }
+            $changed = $optIn !== $customer->marketing_opt_in;
             $customer->update([...$data, 'marketing_opt_in' => $optIn]);
+            if ($changed) {
+                app(NewsletterService::class)->syncCustomer($customer->fresh(), $optIn, 'account', self::clientIp($request));
+            }
         });
 
         return response()->json(['data' => self::profile($customer->fresh())]);

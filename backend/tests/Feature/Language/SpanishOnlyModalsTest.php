@@ -9,11 +9,17 @@ use App\Domain\Catalog\Models\Media;
 use App\Domain\Content\Models\Menu;
 use App\Domain\Content\Models\Theme;
 use App\Domain\Content\Services\PageService;
+use App\Domain\Content\Services\RedirectService;
 use App\Domain\Customers\Models\Customer;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Models\InventoryLevel;
 use App\Domain\Inventory\Models\Warehouse;
 use App\Domain\Inventory\Services\InventoryService;
+use App\Domain\Marketing\Models\Automation;
+use App\Domain\Marketing\Models\Campaign;
+use App\Domain\Marketing\Models\Coupon;
+use App\Domain\Marketing\Models\NewsletterSubscriber;
+use App\Domain\Marketing\Models\Promotion;
 use App\Domain\Notifications\Models\EmailLog;
 use App\Domain\Notifications\Models\EmailTemplate;
 use App\Domain\Orders\Services\OrderPayments;
@@ -29,9 +35,16 @@ use App\Filament\Pages\PaymentSettingsPage;
 use App\Filament\Pages\ReturnSettingsPage;
 use App\Filament\Pages\ShippingSimulator;
 use App\Filament\Pages\ThemesPage;
+use App\Filament\Pages\WhatsAppSettingsPage;
 use App\Filament\Resources\Attributes\Pages\ListAttributes;
+use App\Filament\Resources\Automations\Pages\ManageAutomations;
+use App\Filament\Resources\BlogCategories\Pages\ManageBlogCategories;
+use App\Filament\Resources\BlogPosts\Pages\CreateBlogPost;
 use App\Filament\Resources\Brands\Pages\ManageBrands;
+use App\Filament\Resources\Campaigns\Pages\CreateCampaign;
+use App\Filament\Resources\Campaigns\Pages\EditCampaign;
 use App\Filament\Resources\Categories\Pages\ListCategories;
+use App\Filament\Resources\Coupons\Pages\ManageCoupons;
 use App\Filament\Resources\Couriers\Pages\ManageCouriers;
 use App\Filament\Resources\Customers\Pages\ViewCustomer;
 use App\Filament\Resources\EmailLogs\Pages\ManageEmailLogs;
@@ -41,6 +54,7 @@ use App\Filament\Resources\MediaFolders\Pages\ManageMediaFolders;
 use App\Filament\Resources\MediaLibrary\Pages\ManageMedia;
 use App\Filament\Resources\Menus\Pages\EditMenu;
 use App\Filament\Resources\Menus\Pages\ListMenus;
+use App\Filament\Resources\NewsletterSubscribers\Pages\ManageNewsletterSubscribers;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
 use App\Filament\Resources\Pages\Pages\CreatePage;
@@ -53,6 +67,8 @@ use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Resources\Products\RelationManagers\MediaRelationManager;
 use App\Filament\Resources\Products\RelationManagers\RelatedProductsRelationManager;
 use App\Filament\Resources\Products\RelationManagers\VariantsRelationManager;
+use App\Filament\Resources\Promotions\Pages\ManagePromotions;
+use App\Filament\Resources\Redirects\Pages\ManageRedirects;
 use App\Filament\Resources\Returns\Pages\ViewReturn;
 use App\Filament\Resources\Shipments\Pages\ViewShipment;
 use App\Filament\Resources\ShippingIncidents\Pages\ManageShippingIncidents;
@@ -300,6 +316,52 @@ class SpanishOnlyModalsTest extends TestCase
         $this->check('Temas', Livewire::test(ThemesPage::class));
         $this->check('Temas: usar', Livewire::test(ThemesPage::class)->mountAction('activate', ['theme' => Theme::query()->where('code', 'lujo')->value('id')]));
         $this->check('Temas: contraste insuficiente', Livewire::test(ThemesPage::class)->fillForm(['accent' => '#ffffff', 'accent-fg' => '#fefefe'])->call('save'));
+
+        $this->assertSame([], array_values(array_unique($this->problems)),
+            "Texto en inglés en modales o validaciones:\n".implode("\n", array_unique($this->problems)));
+    }
+
+    public function test_marketing_modals_and_validation_messages_are_in_spanish(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $admin = User::factory()->create(['status' => 'active']);
+        $admin->assignRole('super-admin');
+        $this->actingAs($admin);
+
+        $coupon = Coupon::query()->create(['code' => 'VERANO10', 'name' => 'Verano', 'type' => 'percent', 'value' => 10]);
+        $promotion = Promotion::query()->create(['name' => '3x2', 'type' => 'buy_x_get_y', 'conditions' => ['buy_quantity' => 2], 'actions' => ['value' => 100, 'get_quantity' => 1]]);
+        $subscriber = NewsletterSubscriber::query()->create(['email' => 'ana@correo.cl', 'source' => 'footer', 'status' => 'pending', 'confirm_sent_at' => now()]);
+        $campaign = Campaign::query()->create(['name' => 'Cyber', 'subject' => 'Ofertas', 'heading' => 'Cyber', 'body' => 'Hola']);
+        $redirect = app(RedirectService::class)->save(null, '/tienda/a', '/catalogo');
+
+        $this->check('Cupones: nuevo', Livewire::test(ManageCoupons::class)->mountAction('create'));
+        $this->check('Cupones: nuevo (vacío)', Livewire::test(ManageCoupons::class)->callAction('create', data: ['type' => 'percent']));
+        $this->check('Cupones: código con espacios y fechas al revés', Livewire::test(ManageCoupons::class)->callAction('create', data: [
+            'code' => 'a b', 'name' => 'x', 'type' => 'percent', 'value' => 500, 'starts_at' => now()->addDay()->format('Y-m-d H:i'), 'ends_at' => now()->format('Y-m-d H:i'),
+        ]));
+        $this->check('Cupones: código repetido', Livewire::test(ManageCoupons::class)->callAction('create', data: ['code' => 'verano10', 'name' => 'x', 'type' => 'fixed', 'value' => 1000]));
+        $this->check('Cupones: editar', Livewire::test(ManageCoupons::class)->mountTableAction('edit', $coupon));
+        $this->check('Promociones: nueva (vacía)', Livewire::test(ManagePromotions::class)->callAction('create', data: ['type' => 'cart_amount']));
+        $this->check('Promociones: editar 3x2', Livewire::test(ManagePromotions::class)->mountTableAction('edit', $promotion));
+        $this->check('Boletín: agregar (vacío)', Livewire::test(ManageNewsletterSubscribers::class)->callAction('add', data: ['email' => 'no-es-correo']));
+        $this->check('Boletín: dar de baja', Livewire::test(ManageNewsletterSubscribers::class)->mountTableAction('unsubscribe', $subscriber));
+        $this->check('Boletín: reenviar', Livewire::test(ManageNewsletterSubscribers::class)->mountTableAction('resend', $subscriber));
+        $this->check('Campañas: nueva (vacía)', Livewire::test(CreateCampaign::class)->fillForm(['audience' => null])->call('create'));
+        $edit = fn () => Livewire::test(EditCampaign::class, ['record' => $campaign->getRouteKey()]);
+        $this->check('Campaña: botón sin texto', $edit()->fillForm(['button_url' => '/catalogo', 'button_label' => ''])->call('save'));
+        $this->check('Campaña: prueba', $edit()->mountAction('test'));
+        $this->check('Campaña: programar', $edit()->mountAction('schedule'));
+        $this->check('Campaña: programar sin suscritos', $edit()->callAction('schedule', data: ['now' => true]));
+        $this->check('Campaña: programar en el pasado', $edit()->callAction('schedule', data: ['now' => false, 'at' => now()->subDay()->format('Y-m-d H:i')]));
+        $this->check('Automatizaciones: editar', Livewire::test(ManageAutomations::class)->mountTableAction('edit', Automation::query()->first()));
+        $this->check('Automatizaciones: activar', Livewire::test(ManageAutomations::class)->mountTableAction('toggle', Automation::query()->first()));
+        $this->check('WhatsApp', Livewire::test(WhatsAppSettingsPage::class));
+        $this->check('WhatsApp: número inválido', Livewire::test(WhatsAppSettingsPage::class)->fillForm(['enabled' => true, 'phone' => 'abc'])->call('save'));
+        $this->check('Blog: nuevo (vacío)', Livewire::test(CreateBlogPost::class)->fillForm(['status' => null])->call('create'));
+        $this->check('Blog: categorías', Livewire::test(ManageBlogCategories::class)->callAction('create', data: []));
+        $this->check('Redirecciones: nueva protegida', Livewire::test(ManageRedirects::class)->callAction('create', data: ['from_path' => '/api/x', 'to_path' => 'ftp://x', 'code' => 301]));
+        $this->check('Redirecciones: ciclo', Livewire::test(ManageRedirects::class)->callAction('create', data: ['from_path' => '/catalogo', 'to_path' => '/tienda/a', 'code' => 301]));
+        $this->check('Redirecciones: eliminar', Livewire::test(ManageRedirects::class)->mountTableAction('delete', $redirect));
 
         $this->assertSame([], array_values(array_unique($this->problems)),
             "Texto en inglés en modales o validaciones:\n".implode("\n", array_unique($this->problems)));

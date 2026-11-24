@@ -2,6 +2,7 @@
 
 namespace App\Domain\Catalog\Models;
 
+use App\Domain\Content\Concerns\RedirectsOnSlugChange;
 use App\Domain\System\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,7 @@ use Illuminate\Support\Str;
 
 class Brand extends Model
 {
-    use Auditable;
+    use Auditable, RedirectsOnSlugChange;
 
     public const STATUSES = ['active' => 'Activa', 'archived' => 'Archivada'];
 
@@ -57,5 +58,10 @@ class Brand extends Model
     public function scopeActive(Builder $query): void
     {
         $query->where('status', 'active');
+    }
+
+    public function storefrontPath(): string
+    {
+        return '/marca/'.$this->slug;
     }
 }
