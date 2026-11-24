@@ -2,6 +2,7 @@ import Image from "next/image";
 import type { OrderDetail } from "@/lib/types";
 import { formatMoney, mediaUrl } from "@/lib/format";
 import { PayButton } from "./PayButton";
+import { ShipmentCard } from "./ShipmentCard";
 
 const dateFormat = new Intl.DateTimeFormat("es-CL", { dateStyle: "long", timeStyle: "short", timeZone: "America/Santiago" });
 
@@ -22,6 +23,9 @@ export function OrderView({ order, orderToken }: { order: OrderDetail; orderToke
           <Badge>{order.status_label}</Badge>
           <Badge tone={order.payment_status === "paid" ? "ok" : order.payment_status === "pending" ? "warn" : "muted"}>Pago: {order.payment_status_label}</Badge>
           {pay.status === "failed" || pay.status === "aborted" ? <Badge tone="warn">Último intento: {pay.status_label}</Badge> : null}
+          {order.fulfillment_status !== "unfulfilled" && order.status !== "cancelled" ? (
+            <Badge tone={order.fulfillment_status === "delivered" ? "ok" : "muted"}>Despacho: {order.fulfillment_status_label}</Badge>
+          ) : null}
         </div>
 
         {pay.can_pay && orderToken && (
@@ -58,6 +62,19 @@ export function OrderView({ order, orderToken }: { order: OrderDetail; orderToke
               <Row label="Asunto o comentario" value={`Pedido ${order.number}`} />
             </dl>
             {transfer.instructions && <p className="mt-6 whitespace-pre-line text-sm">{transfer.instructions}</p>}
+          </section>
+        )}
+
+        {order.shipments.length > 0 && (
+          <section aria-labelledby="despachos-titulo">
+            <h2 id="despachos-titulo" className="label">
+              {order.shipping.type === "pickup" ? "Retiro" : "Seguimiento del despacho"}
+            </h2>
+            <div className="mt-3 space-y-4">
+              {order.shipments.map((s, i) => (
+                <ShipmentCard key={i} shipment={s} index={i + 1} total={order.shipments.length} showFollowLink />
+              ))}
+            </div>
           </section>
         )}
 
@@ -125,6 +142,7 @@ export function OrderView({ order, orderToken }: { order: OrderDetail; orderToke
           <p className="label">Entrega</p>
           <p className="mt-2 font-medium">{order.shipping.method ?? "—"}</p>
           {order.shipping.estimated_days && <p className="text-muted">Plazo estimado: {order.shipping.estimated_days}</p>}
+          {order.shipping.pickup_address && <p className="mt-2 text-muted">Retiras en: {order.shipping.pickup_address}</p>}
           {address && (
             <p className="mt-2 text-muted">
               {address.recipient && (

@@ -17,6 +17,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ### Agregado
 
+- Fase 7 (envíos y seguimiento):
+  - Motor de tarifas: zonas de envío (regiones completas, comunas sueltas, comunas excluidas y prioridad), tarifas por zona y rango de peso (límites incluidos), peso volumétrico por factor, peso máximo, cadena de frío, envío gratis desde un monto y retiro en tienda con dirección, horario e instrucciones.
+  - El checkout cotiza con la comuna y el peso del carrito; al pagar, el servidor vuelve a calcular y guarda zona, courier y peso cobrado en el pedido.
+  - *Logística → Simulador de tarifas*: muestra todos los métodos para un destino y un paquete, con precio o el motivo por el que no se ofrecen.
+  - Despachos: totales o parciales desde el pedido, estados con transiciones controladas, número y enlace de seguimiento, correos al cliente (despachado, listo para retiro, entregado, retirado). El pedido pasa a *Completado* cuando todo se entrega.
+  - Página pública `/seguimiento/<enlace>` y seguimiento en el pedido del cliente, sin nombres ni dirección.
+  - Incidencias de despacho con responsable y solución (*Logística → Incidencias*).
+  - *Logística → Couriers* (Chilexpress, Starken, Blue Express) en modo manual. La conexión por API queda **No verificada** hasta contar con credenciales de prueba.
+  - API 0.8.0: `GET /shipments/{token}`, parámetro `commune` en `/checkout/options` y despachos en el pedido.
+  - Manuales: zonas de envío, couriers, despachos, incidencias y simulador; métodos de envío y pedidos actualizados.
 - Fase 6 (pagos con Webpay Plus):
   - Contrato común para pasarelas de pago y Webpay Plus (API REST v1.2 de Transbank).
   - El pago se confirma siempre con Transbank desde el servidor, comparando monto y orden de compra. Volver dos veces de Webpay o recargar no cobra ni descuenta stock dos veces.

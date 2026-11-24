@@ -7,16 +7,19 @@ use App\Domain\Orders\Models\OrderEvent;
 use App\Domain\Orders\Models\OrderItem;
 use App\Domain\Orders\Models\Payment;
 use App\Domain\Payments\Gateways\WebpayPlus\WebpayPlusGateway;
+use App\Domain\Shipping\Models\Shipment;
+use App\Domain\Shipping\Services\ShipmentService;
+use App\Domain\Shipping\Services\ShipmentTokens;
 
 /** Forma pública del pedido para la tienda. Nunca incluye costos ni datos internos. */
 class OrderPresenter
 {
-    public function __construct(private readonly PaymentSettings $payments) {}
+    public function __construct(private readonly PaymentSettings $payments, private readonly ShipmentService $shipments) {}
 
     /** @param bool $full con sesión del dueño: dirección completa. Por token: solo comuna y región. */
     public function present(Order $order, bool $full): array
     {
-        $order->loadMissing(['items', 'shippingLine', 'events', 'latestPayment']);
+        $order->loadMissing(['items', 'shippingLine', 'events', 'latestPayment', 'shipments.items.orderItem', 'shipments.events']);
         $address = $order->shipping_address;
         $payment = $order->latestPayment;
 
@@ -28,6 +31,8 @@ class OrderPresenter
             'status_label' => Order::STATUSES[$order->status] ?? $order->status,
             'payment_status' => $order->payment_status,
             'payment_status_label' => Order::PAYMENT_STATUSES[$order->payment_status] ?? $order->payment_status,
+            'fulfillment_status' => $order->fulfillment_status,
+            'fulfillment_status_label' => Order::FULFILLMENT_STATUSES[$order->fulfillment_status] ?? $order->fulfillment_status,
             'first_name' => $order->first_name,
             'email' => $full ? $order->email : null,
             'items' => $order->items->map(fn (OrderItem $i) => [
@@ -47,6 +52,7 @@ class OrderPresenter
                 'method' => $order->shippingLine?->method_name,
                 'type' => $order->shippingLine?->type,
                 'estimated_days' => $order->shippingLine?->estimated_days,
+                'pickup_address' => $order->shippingLine?->pickup_address,
                 'address' => $address ? ($full ? $address : [
                     'commune' => $address['commune'] ?? null,
                     'region' => $address['region'] ?? null,
@@ -70,11 +76,39 @@ class OrderPresenter
                 'authorization_code' => $payment?->status === 'paid' ? $payment->authorization_code : null,
                 'refunded_amount' => $order->refunded_total,
             ],
+            'shipments' => $order->shipments->where('status', '!=', 'cancelled')->map(fn (Shipment $s) => $this->shipment($s))->values()->all(),
             'document_type' => $order->document_type,
             'events' => $order->events->where('visible_to_customer', true)->map(fn (OrderEvent $e) => [
                 'type' => $e->type,
                 'label' => $e->label(),
                 'at' => $e->created_at?->toIso8601String(),
+            ])->values()->all(),
+        ];
+    }
+
+    /** Despacho visible para el cliente: estado, courier, seguimiento y productos. Nunca nombres ni direcciones. */
+    public function shipment(Shipment $s): array
+    {
+        return [
+            'status' => $s->status,
+            'status_label' => $s->statusLabel(),
+            'carrier' => $s->carrier_name,
+            'tracking_number' => $s->tracking_number,
+            'tracking_url' => $this->shipments->trackingUrl($s),
+            'follow_token' => ShipmentTokens::for($s->uuid),
+            'shipped_at' => $s->shipped_at?->toIso8601String(),
+            'delivered_at' => $s->delivered_at?->toIso8601String(),
+            'items' => $s->items->map(fn ($i) => [
+                'name' => $i->orderItem?->product_name,
+                'variant_label' => $i->orderItem?->variant_label,
+                'quantity' => $i->quantity,
+            ])->values()->all(),
+            'events' => $s->events->map(fn ($e) => [
+                'status' => $e->status,
+                'label' => Shipment::STATUSES[$e->status] ?? $e->status,
+                'description' => $e->description,
+                'location' => $e->location,
+                'at' => $e->occurred_at?->toIso8601String(),
             ])->values()->all(),
         ];
     }

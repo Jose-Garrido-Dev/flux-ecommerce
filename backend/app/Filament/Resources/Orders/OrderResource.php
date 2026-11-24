@@ -8,8 +8,13 @@ use App\Domain\Orders\Models\OrderItem;
 use App\Domain\Orders\Models\Payment;
 use App\Domain\Payments\Gateways\WebpayPlus\WebpayPlusGateway;
 use App\Domain\Payments\Models\Refund;
+use App\Domain\Shipping\Models\Courier;
+use App\Domain\Shipping\Models\Shipment;
+use App\Domain\Shipping\Models\ShippingIncident;
+use App\Domain\Shipping\Services\RateEngine;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
+use App\Filament\Resources\Shipments\ShipmentResource;
 use BackedEnum;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
@@ -91,10 +96,22 @@ class OrderResource extends Resource
                 ]),
                 Section::make('Entrega')->columns(2)->schema([
                     TextEntry::make('shippingLine.method_name')->label('Método')->placeholder('—')
-                        ->belowContent(fn (Order $record) => $record->shippingLine?->estimated_days),
+                        ->belowContent(fn (Order $record) => self::shippingDetail($record)),
                     TextEntry::make('address')->label('Dirección')->placeholder('Retiro en tienda')
                         ->state(fn (Order $record) => self::address($record)),
                     TextEntry::make('notes')->label('Comentarios del cliente')->placeholder('—')->columnSpanFull(),
+                ]),
+                Section::make('Despachos')->visible(fn (Order $record) => $record->shipments()->exists())->schema([
+                    RepeatableEntry::make('shipments')->label('Despachos')->hiddenLabel()->columns(4)->schema([
+                        TextEntry::make('carrier_name')->label('Entrega')
+                            ->belowContent(fn (Shipment $record) => $record->tracking_number ? 'Seguimiento '.$record->tracking_number : null)
+                            ->url(fn (Shipment $record) => ShipmentResource::getUrl('view', ['record' => $record])),
+                        TextEntry::make('status')->label('Estado')->badge()
+                            ->formatStateUsing(fn ($state) => Shipment::STATUSES[$state] ?? $state)
+                            ->color(fn ($state) => ShipmentResource::statusColor($state)),
+                        TextEntry::make('contents')->label('Contenido')->columnSpan(2)
+                            ->state(fn (Shipment $record) => $record->items->map(fn ($i) => $i->quantity.' × '.$i->orderItem?->product_name)->implode(', ')),
+                    ]),
                 ]),
                 Section::make('Pagos')->schema([
                     RepeatableEntry::make('payments')->label('Pagos')->hiddenLabel()->columns(4)->schema([
@@ -138,6 +155,10 @@ class OrderResource extends Resource
                         ->visible(fn (Order $record) => $record->payment_status === 'pending'),
                     TextEntry::make('latestPayment.reference')->label('N.º de operación')->placeholder('—')
                         ->visible(fn (Order $record) => $record->payment_status === 'paid'),
+                    TextEntry::make('fulfillment_status')->label('Despacho')->badge()
+                        ->formatStateUsing(fn ($state) => Order::FULFILLMENT_STATUSES[$state] ?? $state)
+                        ->color(fn ($state) => in_array($state, ['delivered', 'picked_up'], true) ? 'success' : ($state === 'unfulfilled' ? 'gray' : 'info'))
+                        ->visible(fn (Order $record) => $record->status !== 'pending'),
                     TextEntry::make('placed_at')->label('Fecha del pedido')->dateTime('d-m-Y H:i'),
                 ]),
                 Section::make('Cliente')->schema([
@@ -165,6 +186,23 @@ class OrderResource extends Resource
             ."\n{$a['commune']}, {$a['region']}".(($a['reference'] ?? null) ? "\nReferencia: {$a['reference']}" : ''));
     }
 
+    public static function shippingDetail(Order $order): ?string
+    {
+        $line = $order->shippingLine;
+        if (! $line) {
+            return null;
+        }
+        $parts = array_filter([
+            $line->estimated_days,
+            $line->carrier_code ? 'Courier: '.(Courier::for($line->carrier_code)?->name ?? $line->carrier_code) : null,
+            $line->zone_name ? "Zona {$line->zone_name}" : null,
+            $line->chargeable_weight_g ? 'Peso cobrado '.RateEngine::kg($line->chargeable_weight_g) : null,
+            $line->pickup_address ? "Retiro en {$line->pickup_address}" : null,
+        ]);
+
+        return $parts ? implode(' · ', $parts) : null;
+    }
+
     public static function paymentDetail(Payment $payment): ?string
     {
         $parts = array_filter([
@@ -190,6 +228,8 @@ class OrderResource extends Resource
             'placed' => Payment::METHODS[$p['payment_method'] ?? 'bank_transfer'] ?? null,
             'refunded' => trim('Monto '.self::money($p['amount'] ?? null).(isset($p['reason']) ? " · {$p['reason']}" : '').(! empty($p['restocked']) ? ' · Productos devueltos al stock' : '')),
             'note' => $p['text'] ?? null,
+            'shipment_created' => $p['carrier'] ?? null,
+            'incident_opened' => ShippingIncident::TYPES[$p['type'] ?? ''] ?? null,
             default => null,
         };
     }
@@ -213,11 +253,15 @@ class OrderResource extends Resource
                     ->formatStateUsing(fn ($state) => Order::PAYMENT_STATUSES[$state] ?? $state)->color(fn ($state) => self::statusColor($state)),
                 TextColumn::make('status')->label('Estado')->badge()
                     ->formatStateUsing(fn ($state) => Order::STATUSES[$state] ?? $state)->color(fn ($state) => self::statusColor($state)),
+                TextColumn::make('fulfillment_status')->label('Despacho')->badge()
+                    ->formatStateUsing(fn ($state, Order $record) => $record->status === 'pending' ? '—' : (Order::FULFILLMENT_STATUSES[$state] ?? $state))
+                    ->color(fn ($state) => in_array($state, ['delivered', 'picked_up'], true) ? 'success' : ($state === 'unfulfilled' ? 'warning' : 'info')),
                 TextColumn::make('shippingLine.method_name')->label('Envío')->placeholder('—')->toggleable(),
             ])
             ->filters([
                 SelectFilter::make('status')->label('Estado')->options(Order::STATUSES),
                 SelectFilter::make('payment_status')->label('Pago')->options(Order::PAYMENT_STATUSES),
+                SelectFilter::make('fulfillment_status')->label('Despacho')->options(Order::FULFILLMENT_STATUSES),
                 Filter::make('dates')->label('Fechas')
                     ->schema([DatePicker::make('from')->label('Desde'), DatePicker::make('until')->label('Hasta')])
                     ->query(fn (Builder $query, array $data) => $query

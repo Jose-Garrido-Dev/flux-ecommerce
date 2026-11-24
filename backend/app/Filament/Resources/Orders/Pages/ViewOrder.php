@@ -7,14 +7,21 @@ use App\Domain\Orders\Services\OrderPayments;
 use App\Domain\Payments\Services\GatewayException;
 use App\Domain\Payments\Services\PaymentProcessor;
 use App\Domain\Payments\Services\RefundService;
+use App\Domain\Shipping\Models\Courier;
+use App\Domain\Shipping\Services\ShipmentService;
 use App\Filament\Concerns\HasHelpManual;
 use App\Filament\Resources\Orders\OrderResource;
+use App\Filament\Resources\Shipments\ShipmentResource;
 use App\Filament\Support\InventoryActions;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Support\Icons\Heroicon;
 
 class ViewOrder extends ViewRecord
@@ -79,6 +86,63 @@ class ViewOrder extends ViewRecord
                     };
                     Notification::make()->{$type}()->title($title)->send();
                     $this->refreshFormData([]);
+                }),
+            Action::make('ship')->label('Crear despacho')->icon(Heroicon::OutlinedPaperAirplane)->color('primary')
+                ->visible(fn (Order $record) => $record->status === 'processing'
+                    && in_array($record->payment_status, ['paid', 'partially_refunded'], true)
+                    && array_sum(app(ShipmentService::class)->remaining($record)) > 0)
+                ->authorize(fn () => auth()->user()?->can('shipping.dispatch'))
+                ->modalHeading(fn (Order $record) => $record->shippingLine?->type === 'pickup' ? 'Preparar el retiro en tienda' : 'Crear despacho')
+                ->modalDescription('Indica cuánto va en este despacho. Puedes despachar en partes: lo que quede se envía en otro despacho.')
+                ->modalSubmitActionLabel('Crear despacho')
+                ->fillForm(function (Order $record) {
+                    $left = app(ShipmentService::class)->remaining($record);
+
+                    return [
+                        'items' => collect($left)->mapWithKeys(fn ($qty, $id) => ['i'.$id => $qty])->all(),
+                        'carrier_code' => $record->shippingLine?->carrier_code,
+                        'packages' => 1,
+                    ];
+                })
+                ->schema(fn (Order $record) => [
+                    Section::make('Productos')->schema(collect(app(ShipmentService::class)->remaining($record))
+                        ->filter(fn ($qty) => $qty > 0)
+                        ->map(function ($qty, $id) use ($record) {
+                            $item = $record->items->firstWhere('id', $id);
+
+                            return TextInput::make('items.i'.$id)->label($item->product_name.($item->variant_label ? ' · '.$item->variant_label : ''))
+                                ->helperText('SKU '.$item->sku.' · faltan '.$qty)->integer()->minValue(0)->maxValue($qty)->required();
+                        })->values()->all()),
+                    Grid::make(2)->visible($record->shippingLine?->type !== 'pickup')->schema([
+                        Select::make('carrier_code')->label('Courier')->placeholder('Despacho propio')
+                            ->options(fn () => Courier::query()->where('enabled', true)->orderBy('name')->pluck('name', 'code')),
+                        TextInput::make('tracking_number')->label('N.º de seguimiento')->maxLength(80)->helperText('Puedes agregarlo después.'),
+                        TextInput::make('packages')->label('Bultos')->integer()->minValue(1)->maxValue(99),
+                        TextInput::make('weight_kg')->label('Peso')->suffix('kg')->numeric()->minValue(0),
+                        TextInput::make('cost_amount')->label('Costo del courier')->prefix('$')->integer()->minValue(0)
+                            ->helperText('Lo que te cobra el courier. Solo uso interno.'),
+                    ]),
+                    Textarea::make('notes')->label('Notas internas')->maxLength(1000),
+                ])
+                ->action(function (array $data, Order $record) {
+                    $items = collect($data['items'] ?? [])->mapWithKeys(fn ($qty, $key) => [(int) substr($key, 1) => (int) $qty])
+                        ->filter(fn ($qty) => $qty > 0)->all();
+                    if ($items === []) {
+                        Notification::make()->danger()->title('Indica al menos un producto')->send();
+
+                        return;
+                    }
+                    $shipment = InventoryActions::run(fn () => app(ShipmentService::class)->create($record, $items, [
+                        'carrier_code' => $data['carrier_code'] ?? null,
+                        'tracking_number' => $data['tracking_number'] ?? null,
+                        'packages' => $data['packages'] ?? 1,
+                        'weight_g' => filled($data['weight_kg'] ?? null) ? (int) round((float) $data['weight_kg'] * 1000) : null,
+                        'cost_amount' => filled($data['cost_amount'] ?? null) ? (int) $data['cost_amount'] : null,
+                        'notes' => $data['notes'] ?? null,
+                    ]));
+                    Notification::make()->success()->title('Despacho creado')
+                        ->body('Cuando salga, márcalo como Despachado en el despacho: el cliente recibe un correo con el seguimiento.')->send();
+                    $this->redirect(ShipmentResource::getUrl('view', ['record' => $shipment]));
                 }),
             Action::make('refund')->label('Reembolsar')->icon(Heroicon::OutlinedReceiptRefund)->color('warning')
                 ->visible(fn (Order $record) => ($record->payments()->where('status', 'paid')->latest('id')->first()?->refundable() ?? 0) > 0)

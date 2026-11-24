@@ -1,13 +1,13 @@
 # Pedidos
 
-**Para qué sirve:** ver los pedidos de la tienda, confirmar las transferencias recibidas, revisar los pagos con Webpay, reembolsar y cancelar los que no se pagarán.
+**Para qué sirve:** ver los pedidos de la tienda, confirmar las transferencias recibidas, revisar los pagos con Webpay, despachar, reembolsar y cancelar los que no se pagarán.
 
 ## Estados
 | Estado del pedido | Significado |
 | --- | --- |
 | Pendiente de pago | El cliente compró y debe pagar (transferencia o Webpay). El stock está reservado |
 | En preparación | El pago se confirmó: hay que preparar y despachar |
-| Completado | Entregado (se usará desde la fase de logística) |
+| Completado | Todos sus despachos fueron entregados o retirados |
 | Cancelado | Anulado a mano o porque venció el plazo de pago. El stock se liberó |
 
 | Estado del pago | Significado |
@@ -18,6 +18,18 @@
 | Reembolsado | Se devolvió todo el monto |
 | Vencido | Pasó el plazo sin pago (Configuración → Pagos) |
 | Anulado | Se canceló el pedido antes de pagar |
+
+| Estado del despacho | Significado |
+| --- | --- |
+| Por preparar | Aún no se crea ningún despacho |
+| En preparación | Hay un despacho en preparación |
+| Despachado en parte | Salió una parte; queda algo pendiente |
+| Listo para retiro | (Retiro en tienda) El cliente ya puede retirar |
+| Despachado | Salió todo |
+| Entregado / Retirado | El cliente lo recibió |
+
+## Despachar
+Con el pedido pagado y en preparación, usa **Crear despacho** (permiso *shipping.dispatch*, roles *Logística* y *Administrador de tienda*). Puedes despachar todo o una parte. Los despachos aparecen en la sección *Despachos* del pedido y en *Logística → Despachos*. Ver el manual de Despachos.
 
 ## Confirmar una transferencia
 1. Revisa en tu banco que llegó el dinero y el monto exacto.
@@ -57,3 +69,4 @@ Cada pedido guarda una copia fija de los productos, precios, IVA y dirección de
 ## Relaciones con otros módulos
 - **Inventario → Reservas** muestra el stock apartado por cada pedido pendiente.
 - **Clientes** muestra los pedidos de cada cliente registrado.
+- **Logística → Despachos e Incidencias** muestran los envíos de cada pedido.

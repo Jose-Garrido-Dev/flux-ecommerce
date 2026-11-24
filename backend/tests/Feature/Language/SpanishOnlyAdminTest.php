@@ -16,6 +16,8 @@ use App\Domain\Payments\Models\PaymentGateway;
 use App\Domain\Payments\Services\RefundService;
 use App\Domain\Shipping\Models\Region;
 use App\Domain\Shipping\Models\ShippingMethod;
+use App\Domain\Shipping\Models\ShippingZone;
+use App\Domain\Shipping\Services\ShipmentService;
 use App\Domain\System\Services\SettingsRepository;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -71,13 +73,21 @@ class SpanishOnlyAdminTest extends TestCase
         ], $customer, 'clave');
         app(OrderPayments::class)->confirm($order, $order->grand_total, 'OP-1');
         app(RefundService::class)->refund($order, 1000, 'Descuento por demora');
+        // Logística: zona con tarifa, despacho con seguimiento e incidencia
+        $zone = ShippingZone::query()->create(['name' => 'Santiago', 'region_ids' => [Region::query()->first()->id]]);
+        $table = ShippingMethod::query()->create(['code' => 'courier', 'name' => 'Courier', 'type' => 'table', 'amount' => 0, 'carrier_code' => 'starken']);
+        $table->rates()->create(['zone_id' => $zone->id, 'min_weight_g' => 0, 'max_weight_g' => 5000, 'amount' => 4990]);
+        $shipments = app(ShipmentService::class);
+        $shipment = $shipments->create($order, [], ['carrier_code' => 'starken', 'tracking_number' => '123456']);
+        $shipments->updateStatus($shipment, 'shipped', 'Retirado por el courier');
+        $shipments->openIncident($shipment, 'delay', 'El courier informa atraso');
         // Webpay verificada (pantalla de configuración con estado)
         $webpay = PaymentGateway::for('webpay_plus');
         $webpay->credentials = ['commerce_code' => '597055555532', 'api_key' => 'x'];
         $webpay->save();
         $webpay->update(['enabled' => true, 'verified_at' => now(), 'verified_environment' => 'integration', 'verified_fingerprint' => $webpay->fingerprint()]);
         $records = [
-            'orders' => $order, 'customers' => $customer,
+            'orders' => $order, 'customers' => $customer, 'shipments' => $shipment,
             'stock-transfers' => $transfer,
             'products' => $product, 'categories' => $category, 'brands' => $brand,
             'attributes' => Attribute::query()->first(), 'users' => $admin, 'regions' => Region::query()->first(),
@@ -110,6 +120,11 @@ class SpanishOnlyAdminTest extends TestCase
         $problems = [];
         foreach (array_unique($urls) as $url) {
             $response = $this->get($url);
+            if ($response->status() >= 500) {
+                $problems[] = "$url → error {$response->status()}: ".$response->exception?->getMessage();
+
+                continue;
+            }
             if ($response->status() !== 200) {
                 continue;
             }

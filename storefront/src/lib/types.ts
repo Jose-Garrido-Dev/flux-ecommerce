@@ -137,12 +137,17 @@ export type Cart = {
 export type ShippingOption = {
   code: string;
   name: string;
-  type: "flat" | "pickup";
+  type: "flat" | "table" | "pickup";
   description: string | null;
   amount: number;
   free_over: number | null;
   estimated_days: string | null;
+  carrier_code: string | null;
+  carrier_name: string | null;
   pickup_address: string | null;
+  pickup_hours: string | null;
+  pickup_instructions: string | null;
+  zone_name: string | null;
 };
 
 export type PaymentOption = { code: string; name: string; description: string; type?: "redirect" | "manual"; test_mode?: boolean };
@@ -181,6 +186,8 @@ export type OrderDetail = {
   status_label: string;
   payment_status: string;
   payment_status_label: string;
+  fulfillment_status: string;
+  fulfillment_status_label: string;
   first_name: string;
   email: string | null;
   items: { name: string; variant_label: string | null; sku: string; image: { path: string; alt: string } | null; quantity: number; unit_price: number; line_total: number }[];
@@ -188,7 +195,7 @@ export type OrderDetail = {
   shipping_total: number;
   tax_total: number;
   grand_total: number;
-  shipping: { method: string | null; type: string | null; estimated_days: string | null; address: OrderAddress | null };
+  shipping: { method: string | null; type: string | null; estimated_days: string | null; pickup_address: string | null; address: OrderAddress | null };
   payment: {
     method: string;
     method_code: string | null;
@@ -205,8 +212,35 @@ export type OrderDetail = {
     authorization_code: string | null;
     refunded_amount: number;
   };
+  shipments: Shipment[];
   document_type: string | null;
   events: { type: string; label: string; at: string | null }[];
+};
+
+export type ShipmentEvent = { status: string; label: string; description: string | null; location: string | null; at: string | null };
+
+/** Despacho de un pedido. Nunca trae nombres ni direcciones. */
+export type Shipment = {
+  status: string;
+  status_label: string;
+  carrier: string;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  /** Enlace público de seguimiento (solo en el pedido, no en la página de seguimiento) */
+  follow_token?: string;
+  shipped_at: string | null;
+  delivered_at: string | null;
+  items: { name: string | null; variant_label: string | null; quantity: number }[];
+  events: ShipmentEvent[];
+};
+
+/** Página pública /seguimiento/[token]: solo comuna y región del destino. */
+export type ShipmentTracking = Shipment & {
+  order_number: number;
+  delivery: "pickup" | "delivery";
+  destination: { commune: string | null; region: string | null } | null;
+  estimated_days: string | null;
+  pickup_address: string | null;
 };
 
 export type OrderSummary = {

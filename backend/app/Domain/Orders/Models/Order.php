@@ -4,6 +4,7 @@ namespace App\Domain\Orders\Models;
 
 use App\Domain\Customers\Models\Customer;
 use App\Domain\Payments\Models\Refund;
+use App\Domain\Shipping\Models\Shipment;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,7 +21,10 @@ class Order extends Model
 
     public const PAYMENT_STATUSES = ['pending' => 'Pendiente', 'paid' => 'Pagado', 'expired' => 'Vencido', 'cancelled' => 'Anulado', 'refunded' => 'Reembolsado', 'partially_refunded' => 'Reembolso parcial'];
 
-    public const FULFILLMENT_STATUSES = ['unfulfilled' => 'Por preparar', 'preparing' => 'En preparación', 'shipped' => 'Despachado', 'delivered' => 'Entregado', 'picked_up' => 'Retirado'];
+    public const FULFILLMENT_STATUSES = [
+        'unfulfilled' => 'Por preparar', 'preparing' => 'En preparación', 'partially_shipped' => 'Despachado en parte',
+        'shipped' => 'Despachado', 'ready_for_pickup' => 'Listo para retiro', 'delivered' => 'Entregado', 'picked_up' => 'Retirado',
+    ];
 
     public const DOCUMENT_TYPES = ['boleta' => 'Boleta', 'factura' => 'Factura'];
 
@@ -74,6 +78,11 @@ class Order extends Model
     public function shippingLine(): HasOne
     {
         return $this->hasOne(OrderShippingLine::class);
+    }
+
+    public function shipments(): HasMany
+    {
+        return $this->hasMany(Shipment::class)->orderBy('id');
     }
 
     public function events(): HasMany

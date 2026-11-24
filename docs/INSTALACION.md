@@ -35,7 +35,7 @@ Esta guía explica qué hay que instalar, qué hay que configurar y cómo dejar 
 | Worker | `php artisan queue:work` | Procesa las colas | servicio `worker` |
 | Scheduler | `php artisan schedule:work` | Tareas programadas (reservas vencidas, informes, respaldos) | servicio `scheduler` |
 
-**Todo corre en tu propio servidor.** La configuración por defecto no necesita contratar ningún servicio externo: ni Redis, ni S3, ni buscadores pagados. Redis, Meilisearch y S3 existen solo como opciones para tiendas muy grandes (sección 8.3). Los únicos servicios externos son los que el negocio necesita por naturaleza: pasarela de pago, courier y correo (sección 8).
+**Todo corre en tu propio servidor.** La configuración por defecto no necesita contratar ningún servicio externo: ni Redis, ni S3, ni buscadores pagados. Redis, Meilisearch y S3 existen solo como opciones para tiendas muy grandes (sección 8.4). Los únicos servicios externos son los que el negocio necesita por naturaleza: pasarela de pago, courier y correo (sección 8).
 
 La arquitectura completa, el esquema de base de datos y los flujos están en el documento de diseño técnico (ver [docs/arquitectura.md](arquitectura.md)).
 
@@ -207,13 +207,13 @@ Nunca subas archivos `.env` al repositorio: contienen claves. El `.gitignore` ya
 | `DB_CONNECTION` | `pgsql` | Motor de base de datos |
 | `DB_HOST` / `DB_PORT` | `postgres` / `5432` | En Docker el host es el nombre del servicio |
 | `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` | | Credenciales de la base |
-| `CACHE_STORE` / `QUEUE_CONNECTION` / `SESSION_DRIVER` | `database` | Caché, colas y sesiones en la base de datos (sin servicios extra). `redis` solo si activas Redis (sección 8.3) |
+| `CACHE_STORE` / `QUEUE_CONNECTION` / `SESSION_DRIVER` | `database` | Caché, colas y sesiones en la base de datos (sin servicios extra). `redis` solo si activas Redis (sección 8.4) |
 | `SESSION_DOMAIN` | `.mitienda.cl` | Permite compartir la sesión entre `www` y `api` |
 | `SANCTUM_STATEFUL_DOMAINS` | `www.mitienda.cl,mitienda.cl` | Dominios del storefront que pueden iniciar sesión de clientes |
 | `MAIL_MAILER` | `smtp` | Forma de envío de correo |
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_ENCRYPTION` | | Datos del proveedor SMTP (en desarrollo: `mailpit`, `1025`) |
 | `MAIL_FROM_ADDRESS` / `MAIL_FROM_NAME` | `ventas@mitienda.cl` | Remitente de los correos |
-| `SCOUT_DRIVER` | `database` | Motor de búsqueda. `meilisearch` solo si lo activas (sección 8.3) |
+| `SCOUT_DRIVER` | `database` | Motor de búsqueda. `meilisearch` solo si lo activas (sección 8.4) |
 | `FILESYSTEM_DISK` | `local` | Archivos en el disco del servidor. `s3` es opcional |
 | `REDIS_*`, `MEILISEARCH_*`, `AWS_*` | vacías | Solo si activas esos servicios opcionales |
 | `LOG_CHANNEL` / `LOG_LEVEL` | `stack` / `warning` | Registros. En producción `warning` o `error` |
@@ -466,7 +466,7 @@ Ninguna integración se considera operativa hasta que se prueba con credenciales
 | Flow | Pagos | API Key y Secret Key (sandbox en sandbox.flow.cl) | Panel → Configuración → Pagos | Pendiente: requiere una cuenta de prueba propia. No verificada |
 | Khipu | Transferencia simplificada | ID de cobrador y llave secreta | Panel → Configuración → Pagos | Pendiente: requiere una cuenta de prueba propia. No verificada |
 | Transferencia bancaria | Pago manual | Datos de la cuenta bancaria de la empresa | Panel → Configuración → Pagos | Disponible (Fase 5). No usa servicios externos: el pago se confirma a mano en el panel |
-| Chilexpress / Starken / Blue Express | Cotizar, generar etiquetas y tracking | Contrato comercial y credenciales de API con cada courier | Panel → Configuración → Envíos | Pendiente (Fase 7) |
+| Chilexpress / Starken / Blue Express | Cotizar, generar etiquetas y tracking | Contrato comercial y credenciales de API con cada courier | Panel → Logística → Couriers | Modo manual disponible (Fase 7): tarifas propias por zona y peso, número de seguimiento ingresado a mano y enlace al sitio del courier. Conexión por API: No verificada (faltan credenciales de prueba). Ver sección 8.3 |
 | Correo transaccional | Confirmaciones, recuperación de contraseña | Cuenta SMTP o API (Resend, Postmark, Amazon SES, Brevo) y registros SPF, DKIM y DMARC en el DNS | `backend/.env` (Fase 1) y panel (Fase 8) | Configurable vía `.env` |
 | Proveedor de IA | Asistente y generación de contenido | API Key (por defecto Anthropic Claude) y presupuesto mensual | Panel → Configuración → IA | Pendiente (Fase 12) |
 | Facturación electrónica SII | Boletas y facturas | Proveedor certificado (Bsale, OpenFactura, Nubox, etc.) | Interfaz preparada | Fuera de alcance inicial |
@@ -505,7 +505,21 @@ No hay que instalar nada: Flux habla directo con la API REST de Transbank (v1.2)
 
 **Prueba automática real.** El flujo `.github/workflows/pasarelas.yml` corre en GitHub Actions contra el ambiente de integración: compra, pago rechazado, reintento aprobado, anulación, regreso duplicado y reembolso parcial. Deja capturas y un resumen como artefacto *evidencia-webpay*. Corre cuando cambia el código de pagos, cada lunes y a pedido (*Actions → Pasarelas (prueba real) → Run workflow*).
 
-### 8.3 Servicios opcionales (no necesarios para empezar)
+### 8.3 Envíos y couriers
+
+No hay que instalar nada. Los envíos funcionan sin servicios externos:
+
+1. **Logística → Zonas de envío**: agrupa regiones y comunas que cobran lo mismo (ej.: "Santiago urbano" y "Regiones").
+2. **Logística → Métodos de envío**: crea un método *Tarifas por zona y peso* con su tabla de precios por zona y rango de peso, o *Tarifa fija*. Opcional: factor volumétrico, peso máximo, envío gratis desde un monto, cadena de frío. Activa *Retiro en tienda* si tienes local.
+3. **Catálogo → Productos**: carga el peso (y las medidas si usas factor volumétrico) de cada variante. Sin peso cuentan como 0 kg.
+4. **Logística → Couriers**: marca con cuáles trabajas y pega el enlace de seguimiento de su sitio con `{numero}` donde va el número.
+5. **Logística → Simulador de tarifas**: comprueba qué ve el cliente para una comuna y un paquete.
+
+Después, en cada pedido pagado: **Crear despacho** → número de seguimiento → **Cambiar estado** a *Despachado* (el cliente recibe un correo con el enlace). La página pública `/seguimiento/<enlace>` muestra el avance sin datos personales.
+
+**Conexión por API con los couriers.** Cotizar en línea, generar etiquetas y leer el seguimiento automáticamente necesita las credenciales de prueba de cada courier (requieren contrato de empresa). Hasta que exista una prueba real, el panel muestra la conexión como **No verificada** y la tienda usa las tarifas propias. Cuando tengas las credenciales, guárdalas como secretos de GitHub Actions (no por chat) para implementar y probar la conexión.
+
+### 8.4 Servicios opcionales (no necesarios para empezar)
 
 Por defecto Flux no usa ninguno de estos servicios. Solo valen la pena en tiendas con mucho tráfico o catálogos muy grandes, y los tres **pueden correr en tu misma VPS** sin contratar nada:
 
