@@ -5,6 +5,7 @@ import { formatMoney } from "@/lib/format";
 import { buttonClass } from "@/components/ui/Button";
 import { useCart } from "./CartProvider";
 import { CartLines } from "./CartLines";
+import { CouponForm, DiscountRows } from "./CouponForm";
 
 export function CartPageView() {
   const { cart, loading, error } = useCart();
@@ -52,19 +53,23 @@ export function CartPageView() {
             <dt className="text-muted">Productos ({cart?.count})</dt>
             <dd className="tabular-nums">{formatMoney(cart?.subtotal ?? 0)}</dd>
           </div>
+          <DiscountRows discounts={cart?.discounts} />
           <div className="flex justify-between">
             <dt className="text-muted">Despacho</dt>
-            <dd>Se calcula al pagar</dd>
+            <dd>{cart?.discounts?.free_shipping ? "Gratis con tu cupón" : "Se calcula al pagar"}</dd>
           </div>
           <div className="flex justify-between border-t border-border pt-3 text-base font-semibold">
             <dt>Subtotal</dt>
-            <dd className="tabular-nums">{formatMoney(cart?.subtotal ?? 0)}</dd>
+            <dd className="tabular-nums">{formatMoney(cart?.total ?? cart?.subtotal ?? 0)}</dd>
           </div>
           <div className="flex justify-between text-xs text-muted">
             <dt>IVA incluido</dt>
             <dd className="tabular-nums">{formatMoney(cart?.tax_total ?? 0)}</dd>
           </div>
         </dl>
+        <div className="mt-6">
+          <CouponForm discounts={cart?.discounts} />
+        </div>
         {blocked ? (
           <p className="mt-6 text-sm text-sale">Revisa los productos marcados antes de continuar.</p>
         ) : (

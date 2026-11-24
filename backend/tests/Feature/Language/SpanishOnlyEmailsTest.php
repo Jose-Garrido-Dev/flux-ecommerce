@@ -4,6 +4,9 @@ namespace Tests\Feature\Language;
 
 use App\Domain\Customers\Mail\CustomerMail;
 use App\Domain\Customers\Models\Customer;
+use App\Domain\Marketing\Mail\MarketingMail;
+use App\Domain\Marketing\Mail\NewsletterConfirmMail;
+use App\Domain\Marketing\Models\NewsletterSubscriber;
 use App\Domain\Orders\Mail\NewOrderNotificationMail;
 use App\Domain\Orders\Mail\OrderPlacedMail;
 use App\Domain\Orders\Mail\PaymentConfirmedMail;
@@ -63,6 +66,9 @@ class SpanishOnlyEmailsTest extends TestCase
             new ShipmentMail($order, $shipment, 'picked_up'),
             new CustomerMail($customer, 'verify', 'https://tienda.test/cuenta/verificar'),
             new CustomerMail($customer, 'reset', 'https://tienda.test/cuenta/restablecer'),
+            new NewsletterConfirmMail(NewsletterSubscriber::query()->create(['email' => 'luis@correo.cl', 'source' => 'footer']), 'https://tienda.test/newsletter/confirmar?token=a'),
+            // Campañas y automatizaciones (con productos del carrito abandonado)
+            new MarketingMail('ana@correo.cl', 'Ofertas', 'Cyber', 'Hola **{nombre}**', 'Ver ofertas', 'https://tienda.test/catalogo', 'Solo hoy', ['nombre' => 'Ana'], [['name' => 'Taza', 'variant' => 'Negra', 'quantity' => 1]]),
         ];
         foreach ($mails as $mail) {
             $html = $mail->render();

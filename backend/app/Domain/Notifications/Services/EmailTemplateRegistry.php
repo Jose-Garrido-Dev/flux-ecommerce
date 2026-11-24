@@ -149,6 +149,14 @@ final class EmailTemplateRegistry
                 'intro' => 'Recibimos una solicitud para cambiar la contraseña de tu cuenta en {tienda}.',
                 'variables' => ['nombre' => 'Nombre del cliente'],
             ],
+            'newsletter_confirm' => [
+                'group' => 'Boletín', 'name' => 'Confirmar suscripción', 'required' => true,
+                'description' => 'A quien se suscribe al boletín. Incluye el botón para confirmar la suscripción: sin confirmar no recibe campañas.',
+                'subject' => 'Confirma tu suscripción · {tienda}',
+                'heading' => '¿Confirmas tu suscripción?',
+                'intro' => 'Gracias por querer recibir las novedades y ofertas de {tienda}. Confirma que este es tu correo con el botón:',
+                'variables' => ['nombre' => 'Nombre (si lo indicó)'],
+            ],
         ];
     }
 

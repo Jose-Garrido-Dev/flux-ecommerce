@@ -2,13 +2,16 @@
 
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\Storefront\V1\AuthController;
+use App\Http\Controllers\Api\Storefront\V1\BlogController;
 use App\Http\Controllers\Api\Storefront\V1\CartController;
 use App\Http\Controllers\Api\Storefront\V1\CatalogController;
 use App\Http\Controllers\Api\Storefront\V1\CheckoutController;
 use App\Http\Controllers\Api\Storefront\V1\ContentController;
 use App\Http\Controllers\Api\Storefront\V1\GeoController;
 use App\Http\Controllers\Api\Storefront\V1\MeController;
+use App\Http\Controllers\Api\Storefront\V1\NewsletterController;
 use App\Http\Controllers\Api\Storefront\V1\OrderTrackingController;
+use App\Http\Controllers\Api\Storefront\V1\SeoController;
 use App\Http\Controllers\Api\Storefront\V1\ShipmentTrackingController;
 use App\Http\Controllers\Api\Storefront\V1\StoreController;
 use App\Http\Controllers\Webhooks\PaymentReturnController;
@@ -30,6 +33,20 @@ Route::prefix('storefront/v1')->middleware('throttle:storefront')->group(functio
     Route::get('/pages/{slug}', [ContentController::class, 'page'])->where('slug', '[a-z0-9-]{1,160}');
     Route::get('/preview/{token}', [ContentController::class, 'preview'])->where('token', '[A-Za-z0-9_.-]{20,400}')->middleware('throttle:30,1');
 
+    // Blog y SEO (Fase 10)
+    Route::get('/blog/posts', [BlogController::class, 'index']);
+    Route::get('/blog/posts/{slug}', [BlogController::class, 'show'])->where('slug', '[a-z0-9-]{1,160}');
+    Route::get('/seo/sitemap', [SeoController::class, 'sitemap']);
+    Route::get('/seo/redirects', [SeoController::class, 'redirects']);
+    Route::post('/seo/redirects/hit', [SeoController::class, 'hit'])->middleware('throttle:120,1');
+
+    // Newsletter con doble opt-in (Fase 10)
+    Route::post('/newsletter', [NewsletterController::class, 'subscribe'])->middleware('throttle:5,1');
+    Route::post('/newsletter/confirm', [NewsletterController::class, 'confirm'])->middleware('throttle:20,1');
+    Route::post('/newsletter/unsubscribe', [NewsletterController::class, 'unsubscribe'])->middleware('throttle:20,1');
+    Route::post('/newsletter/baja/{token}', [NewsletterController::class, 'oneClick'])->where('token', '[A-Za-z0-9_.-]{10,400}')->middleware('throttle:60,1');
+    Route::get('/newsletter/clic/{token}', [NewsletterController::class, 'click'])->where('token', '[0-9]+\.[A-Za-z0-9_-]{20,100}')->middleware('throttle:120,1');
+
     Route::prefix('catalog')->group(function () {
         Route::get('/products', [CatalogController::class, 'products']);
         Route::get('/products/{slug}', [CatalogController::class, 'product']);
@@ -46,6 +63,8 @@ Route::prefix('storefront/v1')->middleware('throttle:storefront')->group(functio
     Route::post('/cart/items', [CartController::class, 'add']);
     Route::patch('/cart/items/{sku}', [CartController::class, 'update']);
     Route::delete('/cart/items/{sku}', [CartController::class, 'remove']);
+    Route::post('/cart/coupon', [CartController::class, 'applyCoupon'])->middleware('throttle:10,1');
+    Route::delete('/cart/coupon', [CartController::class, 'removeCoupon']);
 
     Route::get('/checkout/options', [CheckoutController::class, 'options']);
     Route::post('/checkout', [CheckoutController::class, 'store']);

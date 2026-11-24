@@ -10,6 +10,7 @@ import { formatMoney, mediaUrl } from "@/lib/format";
 import { buttonClass } from "@/components/ui/Button";
 import { Alert, Field, fieldAria } from "@/components/ui/Field";
 import { useCart } from "@/components/cart/CartProvider";
+import { CouponForm, DiscountRows } from "@/components/cart/CouponForm";
 import { startPayment } from "@/lib/pay";
 import { AddressFields, emptyAddress, type AddressInput } from "./AddressFields";
 
@@ -22,7 +23,7 @@ type Billing = { document_type: "boleta" | "factura"; billing_rut: string; billi
  * total cambió, responde price_changed para que el cliente lo revise antes de pagar.
  */
 export function CheckoutForm({
-  cart,
+  cart: initialCart,
   regions,
   profile,
   addresses,
@@ -33,7 +34,9 @@ export function CheckoutForm({
   addresses: CustomerAddress[];
 }) {
   const router = useRouter();
-  const { refresh: refreshCart } = useCart();
+  const { refresh: refreshCart, cart: liveCart } = useCart();
+  // El carrito del servidor sirve para pintar; después manda el del navegador (cambia al aplicar un cupón)
+  const cart = liveCart ?? initialCart;
   // Una clave por intento de compra: si la respuesta se pierde y el cliente reintenta, no se duplica el pedido
   const idempotencyKey = useRef<string>("");
   if (!idempotencyKey.current) idempotencyKey.current = newKey();
@@ -56,6 +59,7 @@ export function CheckoutForm({
   const [billing, setBilling] = useState<Billing>({ document_type: "boleta", billing_rut: "", billing_name: "", billing_activity: "" });
   const [notes, setNotes] = useState("");
   const [terms, setTerms] = useState(false);
+  const [newsletter, setNewsletter] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -74,6 +78,7 @@ export function CheckoutForm({
       }
     : address;
   const regionCode = effectiveAddress.region_code;
+  const email = contact.email.trim().toLowerCase();
   const commune = effectiveAddress.commune.trim();
 
   // Los métodos de despacho dependen de la región, la comuna, el peso y el subtotal (el servidor los conoce)
@@ -83,6 +88,8 @@ export function CheckoutForm({
     const params = new URLSearchParams();
     if (regionCode) params.set("region_code", regionCode);
     if (regionCode && commune) params.set("commune", commune);
+    // Con el correo el servidor revisa los límites del cupón por cliente y "solo primera compra"
+    if (EMAIL.test(email)) params.set("email", email);
     const query = params.toString();
     // Espera un momento mientras se escribe la comuna a mano
     const timer = setTimeout(() => bff<CheckoutOptions>(`checkout/options${query ? `?${query}` : ""}`).then((res) => {
@@ -101,12 +108,14 @@ export function CheckoutForm({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [regionCode, commune, cart.subtotal, cart.count]);
+  }, [regionCode, commune, email, cart.subtotal, cart.count, cart.discounts?.coupon?.code]);
 
   const shipping = options?.shipping_methods.find((m) => m.code === shippingCode);
   const payment = options?.payment_methods.find((m) => m.code === paymentCode);
   const isPickup = shipping?.type === "pickup";
-  const total = cart.subtotal + (shipping?.amount ?? 0);
+  const discounts = options?.discounts ?? cart.discounts;
+  const itemsTotal = options?.total ?? cart.total ?? cart.subtotal;
+  const total = itemsTotal + (shipping?.amount ?? 0);
   const blocked = cart.items.some((l) => !l.purchasable || (l.max_quantity !== null && l.quantity > l.max_quantity));
   const noPayment = options !== null && options.payment_methods.length === 0;
 
@@ -130,6 +139,7 @@ export function CheckoutForm({
         ...(billing.document_type === "factura" ? billing : { document_type: "boleta" }),
         notes: notes || undefined,
         accepts_terms: terms,
+        subscribe_newsletter: newsletter || undefined,
         expected_total: total,
       },
     });
@@ -149,7 +159,7 @@ export function CheckoutForm({
 
     setSending(false);
     setErrors(res.errors);
-    if (res.code === "price_changed" || res.code === "cart_changed" || res.code === "stock_insufficient") {
+    if (res.code === "price_changed" || res.code === "cart_changed" || res.code === "stock_insufficient" || res.code === "coupon_invalid") {
       // Recarga el carrito y los totales para que el cliente vea lo nuevo antes de confirmar
       router.refresh();
       await refreshCart();
@@ -242,7 +252,10 @@ export function CheckoutForm({
                     <span className="flex-1">
                       <span className="flex justify-between gap-4 font-medium">
                         {m.name}
-                        <span className="tabular-nums">{m.amount === 0 ? "Gratis" : formatMoney(m.amount)}</span>
+                        <span className="tabular-nums">
+                          {m.original_amount ? <s className="mr-2 font-normal text-muted">{formatMoney(m.original_amount)}</s> : null}
+                          {m.amount === 0 ? "Gratis" : formatMoney(m.amount)}
+                        </span>
                       </span>
                       {m.carrier_name && <span className="mt-1 block text-sm text-muted">Con {m.carrier_name}</span>}
                       {m.description && <span className="mt-1 block text-sm text-muted">{m.description}</span>}
@@ -337,6 +350,7 @@ export function CheckoutForm({
             <dt className="text-muted">Productos</dt>
             <dd className="tabular-nums">{formatMoney(cart.subtotal)}</dd>
           </div>
+          <DiscountRows discounts={discounts} />
           <div className="flex justify-between">
             <dt className="text-muted">Despacho</dt>
             <dd className="tabular-nums">{!shipping ? "—" : shipping.amount === 0 ? "Gratis" : formatMoney(shipping.amount)}</dd>
@@ -351,11 +365,20 @@ export function CheckoutForm({
           </div>
         </dl>
 
+        <div className="mt-5">
+          <CouponForm discounts={discounts} />
+        </div>
+        {errors.coupon && <p className="field-error mt-1">{errors.coupon}</p>}
+
         <label className="mt-6 flex cursor-pointer items-start gap-3 text-sm">
           <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]" aria-invalid={errors.accepts_terms ? true : undefined} />
           <span>Acepto los términos y condiciones y la política de privacidad de la tienda.</span>
         </label>
         {errors.accepts_terms && <p className="field-error mt-1">{errors.accepts_terms}</p>}
+        <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm">
+          <input type="checkbox" checked={newsletter} onChange={(e) => setNewsletter(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]" />
+          <span>Quiero recibir novedades y ofertas por correo (opcional). Te pediremos confirmarlo.</span>
+        </label>
 
         {blocked ? (
           <p className="mt-6 text-sm text-sale">
@@ -398,6 +421,8 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 function includedTax(gross: number): number {
   return gross - Math.round(gross / 1.19);
 }
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function newKey(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();

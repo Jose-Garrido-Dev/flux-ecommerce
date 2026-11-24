@@ -6,12 +6,20 @@ use App\Domain\Cart\Services\CartService;
 use App\Domain\Catalog\Models\Attribute;
 use App\Domain\Catalog\Models\Brand;
 use App\Domain\Catalog\Models\Category;
+use App\Domain\Content\Models\BlogPost;
 use App\Domain\Content\Models\Menu;
 use App\Domain\Content\Services\PageService;
+use App\Domain\Content\Services\RedirectService;
 use App\Domain\Customers\Models\Customer;
 use App\Domain\Inventory\Enums\MovementType;
 use App\Domain\Inventory\Models\Warehouse;
 use App\Domain\Inventory\Services\InventoryService;
+use App\Domain\Marketing\Models\Campaign;
+use App\Domain\Marketing\Models\Coupon;
+use App\Domain\Marketing\Models\NewsletterSubscriber;
+use App\Domain\Marketing\Models\Promotion;
+use App\Domain\Marketing\Services\CampaignService;
+use App\Domain\Marketing\Services\NewsletterService;
 use App\Domain\Notifications\Models\EmailTemplate;
 use App\Domain\Orders\Services\OrderPayments;
 use App\Domain\Orders\Services\PlaceOrder;
@@ -101,13 +109,23 @@ class SpanishOnlyAdminTest extends TestCase
         app(PageService::class)->publish($page);
         app(PageService::class)->saveVersion($page, [['type' => 'rich_text', 'data' => ['body' => 'Hola']]]);
         Menu::for('header')->items()->create(['label' => 'Catálogo', 'link_type' => 'catalog', 'position' => 0]);
+        // Marketing: cupón con productos, promoción, suscriptores, campaña enviada, artículo y redirección
+        $coupon = Coupon::query()->create(['code' => 'VERANO10', 'name' => 'Verano', 'type' => 'percent', 'value' => 10, 'usage_limit' => 100, 'ends_at' => now()->addMonth()]);
+        $coupon->targets()->create(['target_type' => 'category', 'target_id' => $category->id, 'mode' => 'include']);
+        Promotion::query()->create(['name' => '3x2 en poleras', 'type' => 'buy_x_get_y', 'conditions' => ['buy_quantity' => 2], 'actions' => ['value' => 100, 'get_quantity' => 1]]);
+        app(NewsletterService::class)->subscribe('pendiente@correo.cl', 'Luis', 'footer');
+        NewsletterSubscriber::query()->create(['email' => 'ana@correo.cl', 'name' => 'Ana', 'source' => 'checkout', 'status' => 'subscribed', 'confirmed_at' => now()]);
+        $campaign = Campaign::query()->create(['name' => 'Cyber', 'subject' => 'Ofertas', 'heading' => 'Cyber', 'body' => 'Hola', 'created_by' => $admin->id]);
+        app(CampaignService::class)->schedule($campaign);
+        $post = BlogPost::query()->create(['title' => 'Cómo elegir tu talla', 'slug' => 'tallas', 'body' => 'Texto', 'status' => 'published', 'published_at' => now()]);
+        app(RedirectService::class)->save(null, '/tienda/polera', '/producto/polera');
 
         $records = [
             'orders' => $order, 'returns' => $return, 'email-templates' => EmailTemplate::query()->where('key', 'order_placed')->first(), 'customers' => $customer, 'shipments' => $shipment,
             'stock-transfers' => $transfer,
             'products' => $product, 'categories' => $category, 'brands' => $brand,
             'attributes' => Attribute::query()->first(), 'users' => $admin, 'regions' => Region::query()->first(),
-            'pages' => $page, 'menus' => Menu::for('header'),
+            'pages' => $page, 'menus' => Menu::for('header'), 'campaigns' => $campaign, 'blog-posts' => $post,
         ];
 
         $urls = [];
@@ -134,6 +152,7 @@ class SpanishOnlyAdminTest extends TestCase
         $urls[] = '/admin/products/'.$product->getRouteKey().'/edit?relation=1';
         $urls[] = '/admin/products/'.$product->getRouteKey().'/edit?relation=2';
         $urls[] = '/admin/pages/'.$page->getRouteKey().'/edit?relation=0';
+        $urls[] = '/admin/campaigns/'.$campaign->getRouteKey().'/edit?relation=0';
 
         $problems = [];
         foreach (array_unique($urls) as $url) {

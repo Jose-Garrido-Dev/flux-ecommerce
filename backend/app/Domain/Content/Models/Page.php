@@ -2,6 +2,7 @@
 
 namespace App\Domain\Content\Models;
 
+use App\Domain\Content\Concerns\RedirectsOnSlugChange;
 use App\Domain\System\Concerns\Auditable;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /** Página del constructor: portada, landing o institucional. Su contenido vive en versiones inmutables. */
 class Page extends Model
 {
-    use Auditable, HasUuids;
+    use Auditable, HasUuids, RedirectsOnSlugChange;
 
     public const TYPES = [
         'home' => 'Portada',
@@ -79,6 +80,12 @@ class Page extends Model
     }
 
     /** Ruta en la tienda. */
+    /** Solo las páginas publicadas generan redirección al cambiar de dirección. */
+    protected function redirectsEnabled(): bool
+    {
+        return $this->type !== 'home' && $this->published_version_id !== null;
+    }
+
     public function storefrontPath(): string
     {
         return $this->type === 'home' ? '/' : '/'.$this->slug;

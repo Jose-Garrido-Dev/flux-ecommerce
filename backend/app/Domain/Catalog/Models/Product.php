@@ -3,6 +3,7 @@
 namespace App\Domain\Catalog\Models;
 
 use App\Domain\Catalog\Enums\ProductStatus;
+use App\Domain\Content\Concerns\RedirectsOnSlugChange;
 use App\Domain\Pricing\Models\TaxClass;
 use App\Domain\System\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Product extends Model
 {
-    use Auditable, HasUuids;
+    use Auditable, HasUuids, RedirectsOnSlugChange;
 
     protected $fillable = [
         'name', 'slug', 'short_description', 'description', 'brand_id', 'primary_category_id',
@@ -120,5 +121,10 @@ class Product extends Model
         return $this->status === ProductStatus::Active
             && $this->published_at !== null
             && $this->published_at->lte(now());
+    }
+
+    public function storefrontPath(): string
+    {
+        return '/producto/'.$this->slug;
     }
 }

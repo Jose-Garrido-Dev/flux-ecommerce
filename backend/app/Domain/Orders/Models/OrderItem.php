@@ -27,4 +27,18 @@ class OrderItem extends Model
     {
         return $this->belongsTo(ProductVariant::class, 'variant_id');
     }
+
+    /** Lo que el cliente pagó por estas unidades, descontando la parte del cupón o promoción de la línea. */
+    public function paidFor(int $quantity): int
+    {
+        if ($this->quantity <= 0) {
+            return 0;
+        }
+        $quantity = min($quantity, $this->quantity);
+        if ($quantity === $this->quantity) {
+            return $this->line_total - $this->discount_amount;
+        }
+
+        return intdiv(($this->line_total - $this->discount_amount) * $quantity, $this->quantity);
+    }
 }

@@ -22,7 +22,9 @@ final class Labels
         'ShippingZone' => 'Zona de envío', 'ShippingRate' => 'Tarifa de envío', 'Courier' => 'Courier', 'Shipment' => 'Despacho',
         'ShippingIncident' => 'Incidencia de despacho', 'ReturnRequest' => 'Devolución', 'EmailTemplate' => 'Plantilla de correo',
         'Page' => 'Página', 'PageVersion' => 'Versión de página', 'Menu' => 'Menú', 'MenuItem' => 'Enlace de menú', 'Theme' => 'Tema',
-        'Media' => 'Imagen', 'MediaFolder' => 'Carpeta de imágenes',
+        'Media' => 'Imagen', 'MediaFolder' => 'Carpeta de imágenes', 'Coupon' => 'Cupón', 'Promotion' => 'Promoción',
+        'Campaign' => 'Campaña', 'Automation' => 'Automatización', 'NewsletterSubscriber' => 'Suscriptor del newsletter',
+        'BlogPost' => 'Artículo del blog', 'BlogCategory' => 'Categoría del blog', 'Redirect' => 'Redirección',
     ];
 
     public const VERBS = [
@@ -32,6 +34,7 @@ final class Labels
         'blocked' => 'bloqueo', 'unblocked' => 'desbloqueo', 'refunded' => 'reembolso', 'payment_failed' => 'pago rechazado', 'verified' => 'verificación',
         'in_review' => 'en revisión', 'approved' => 'aprobada', 'rejected' => 'rechazada', 'received' => 'recibida', 'processed' => 'resuelta', 'closed' => 'cerrada',
         'published' => 'publicación', 'unpublished' => 'despublicación', 'restored' => 'restauración', 'activated' => 'activación',
+        'scheduled' => 'programación', 'deactivated' => 'desactivación', 'unsubscribed' => 'baja', 'test_sent' => 'envío de prueba',
     ];
 
     public const ACTORS = ['user' => 'Usuario', 'system' => 'Sistema', 'provider' => 'Proveedor', 'customer' => 'Cliente'];

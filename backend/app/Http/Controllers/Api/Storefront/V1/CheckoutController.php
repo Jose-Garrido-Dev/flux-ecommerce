@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\Storefront\V1;
 
 use App\Domain\Cart\Services\CartService;
+use App\Domain\Customers\Models\Customer;
+use App\Domain\Marketing\Services\NewsletterService;
 use App\Domain\Orders\Models\Order;
 use App\Domain\Orders\Services\CheckoutException;
 use App\Domain\Orders\Services\OrderTokens;
@@ -30,17 +32,28 @@ class CheckoutController extends StorefrontController
     /** Métodos de envío para la región elegida y medios de pago disponibles, con el total actualizado. */
     public function options(Request $request): JsonResponse
     {
-        $data = $request->validate(['region_code' => ['nullable', 'string', 'max:8'], 'commune' => ['nullable', 'string', 'max:80']]);
+        $data = $request->validate([
+            'region_code' => ['nullable', 'string', 'max:8'], 'commune' => ['nullable', 'string', 'max:80'], 'email' => ['nullable', 'email', 'max:190'],
+        ]);
         $cart = $this->cart($request, $this->carts);
-        $summary = $cart ? $this->carts->summary($cart) : null;
+        $customer = $this->customer($request);
+        // Con el correo se revisan también los límites del cupón por cliente
+        $summary = $cart ? $this->carts->summary($cart, isset($data['email']) ? Customer::normalizeEmail($data['email']) : $customer?->email, $customer?->id) : null;
         $regionId = isset($data['region_code']) ? Region::query()->where('code', $data['region_code'])->value('id') : null;
         $subtotal = $summary['subtotal'] ?? 0;
+        $total = $summary['total'] ?? 0;
+        $freeShipping = (bool) ($summary['discounts']['free_shipping'] ?? false);
 
         return response()->json(['data' => [
-            'shipping_methods' => $this->shipping->quote($regionId, $data['commune'] ?? null, $subtotal, ShippingPackage::fromLines(array_filter($summary['items'] ?? [], fn ($l) => $l['purchasable'])))
-                ->map(fn ($m) => array_diff_key($m, array_flip(['method_id', 'tax_amount', 'zone_id', 'chargeable_weight_g'])))->all(),
+            // El envío gratis por monto se calcula sobre el total con descuentos
+            'shipping_methods' => $this->shipping->quote($regionId, $data['commune'] ?? null, $total, ShippingPackage::fromLines(array_filter($summary['items'] ?? [], fn ($l) => $l['purchasable'])))
+                ->map(fn ($m) => array_diff_key($m, array_flip(['method_id', 'tax_amount', 'zone_id', 'chargeable_weight_g'])))
+                ->map(fn ($m) => $freeShipping && $m['amount'] > 0 ? [...$m, 'original_amount' => $m['amount'], 'amount' => 0] : $m)->all(),
             'payment_methods' => $this->payments->methods(),
             'subtotal' => $subtotal,
+            'discount_total' => $summary['discount_total'] ?? 0,
+            'total' => $total,
+            'discounts' => CartController::publicSummary($summary)['discounts'],
         ]]);
     }
 
@@ -80,6 +93,7 @@ class CheckoutController extends StorefrontController
             'notes' => ['nullable', 'string', 'max:500'],
             'accepts_terms' => ['accepted'],
             'expected_total' => ['nullable', 'integer', 'min:0'],
+            'subscribe_newsletter' => ['nullable', 'boolean'],
         ], [
             'accepts_terms.accepted' => 'Debes aceptar los términos y condiciones.',
             'billing_rut.required_if' => 'Para factura indica el RUT de la empresa.',
@@ -99,7 +113,12 @@ class CheckoutController extends StorefrontController
         try {
             $order = $existing ?? $placeOrder->handle($cart, $data, $customer, $key, self::clientIp($request));
         } catch (CheckoutException $e) {
-            return $this->problem($e->status, $e->errorCode, $e->getMessage(), $e->summary ? ['cart' => $e->summary] : []);
+            return $this->problem($e->status, $e->errorCode, $e->getMessage(), $e->summary ? ['cart' => CartController::publicSummary($e->summary)] : []);
+        }
+
+        // Newsletter: casilla opcional, sin marcar por defecto. Igual se confirma por correo (doble opt-in)
+        if (! $existing && ($data['subscribe_newsletter'] ?? false)) {
+            app(NewsletterService::class)->subscribe($order->email, $order->first_name, 'checkout', self::clientIp($request), $customer);
         }
 
         return response()->json(['data' => [

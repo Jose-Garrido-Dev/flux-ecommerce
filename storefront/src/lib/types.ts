@@ -10,6 +10,17 @@ export type PublicStore = {
   social: Partial<Record<"instagram" | "facebook" | "tiktok", string>>;
   /** Tema activo (Fase 9). Ausente en un backend anterior: se usan los colores de globals.css. */
   theme?: PublicTheme | null;
+  /** Botón de WhatsApp (Fase 10). null = desactivado. */
+  whatsapp?: WhatsAppConfig | null;
+};
+
+export type WhatsAppConfig = {
+  phone: string;
+  message: string;
+  product_message: string;
+  position: "right" | "left";
+  pages: "all" | "product";
+  label: string;
 };
 
 export type PublicTheme = {
@@ -167,12 +178,26 @@ export type CartLine = {
   /** null = sin límite de stock (no se controla o admite pedidos sin stock) */
   max_quantity: number | null;
   stock: StockStatus | null;
+  /** Descuento de promociones y cupón repartido en esta línea */
+  discount?: number;
+};
+
+export type CartDiscounts = {
+  coupon: { code: string; name: string; amount: number; free_shipping: boolean } | null;
+  /** Por qué el cupón no aplica (vencido, mínimo de compra, etc.) */
+  coupon_error: string | null;
+  promotions: { name: string; amount: number }[];
+  free_shipping: boolean;
 };
 
 export type Cart = {
   items: CartLine[];
   count: number;
   subtotal: number;
+  /** Fase 10: descuentos. Ausentes en un backend anterior. */
+  discount_total?: number;
+  total?: number;
+  discounts?: CartDiscounts;
   tax_total: number;
   warnings: string[];
   currency: string;
@@ -192,11 +217,20 @@ export type ShippingOption = {
   pickup_hours: string | null;
   pickup_instructions: string | null;
   zone_name: string | null;
+  /** Precio antes del envío gratis del cupón */
+  original_amount?: number;
 };
 
 export type PaymentOption = { code: string; name: string; description: string; type?: "redirect" | "manual"; test_mode?: boolean };
 
-export type CheckoutOptions = { shipping_methods: ShippingOption[]; payment_methods: PaymentOption[]; subtotal: number };
+export type CheckoutOptions = {
+  shipping_methods: ShippingOption[];
+  payment_methods: PaymentOption[];
+  subtotal: number;
+  discount_total?: number;
+  total?: number;
+  discounts?: CartDiscounts;
+};
 
 export type GeoRegion = { code: string; name: string; communes: string[] };
 
@@ -245,8 +279,11 @@ export type OrderDetail = {
     quantity: number;
     unit_price: number;
     line_total: number;
+    discount?: number;
   }[];
   subtotal: number;
+  discount_total?: number;
+  discounts?: { label: string; amount: number; target: "items" | "shipping" }[];
   shipping_total: number;
   tax_total: number;
   grand_total: number;
@@ -358,4 +395,29 @@ export type ReturnSummary = {
   can_cancel: boolean;
   created_at: string | null;
   items: { name: string | null; variant_label: string | null; quantity: number }[];
+};
+
+export type BlogPostSummary = {
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  published_at: string;
+  category: { name: string; slug: string } | null;
+  image: Image | null;
+  author: string | null;
+  reading_minutes: number;
+};
+
+export type BlogPost = BlogPostSummary & {
+  html: string;
+  updated_at: string | null;
+  seo: { title: string; description: string | null };
+  related: BlogPostSummary[];
+};
+
+export type BlogIndex = {
+  data: BlogPostSummary[];
+  categories: { name: string; slug: string }[];
+  meta: { current_page: number; last_page: number; total: number };
+  category: { name: string; slug: string } | null;
 };

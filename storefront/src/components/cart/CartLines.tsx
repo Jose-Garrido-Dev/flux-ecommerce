@@ -51,6 +51,9 @@ function Line({ line, compact }: { line: CartLine; compact: boolean }) {
           {formatMoney(line.unit_price)} c/u
           {line.compare_at && <s className="ml-2">{formatMoney(line.compare_at)}</s>}
         </p>
+        {(line.discount ?? 0) > 0 && line.purchasable && (
+          <p className="mt-1 text-xs font-medium text-accent tabular-nums">Descuento −{formatMoney(line.discount ?? 0)}</p>
+        )}
         {line.previous_unit_price !== null && line.purchasable && (
           <p className="mt-1 text-xs font-medium text-sale">Antes {formatMoney(line.previous_unit_price)}: el precio cambió desde que lo agregaste.</p>
         )}

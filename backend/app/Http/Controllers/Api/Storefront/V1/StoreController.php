@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Storefront\V1;
 
 use App\Domain\Content\Services\ThemeService;
+use App\Domain\Marketing\Services\WhatsAppSettings;
 use App\Domain\System\Services\SettingsRepository;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -10,7 +11,7 @@ use Illuminate\Http\JsonResponse;
 /** Datos públicos de la tienda para el storefront. Nunca expone datos internos. */
 class StoreController extends Controller
 {
-    public function show(SettingsRepository $settings, ThemeService $themes): JsonResponse
+    public function show(SettingsRepository $settings, ThemeService $themes, WhatsAppSettings $whatsapp): JsonResponse
     {
         $business = $settings->group('business');
 
@@ -30,6 +31,8 @@ class StoreController extends Controller
                 ->filter()->all(),
             // Tema activo (Fase 9): la tienda lo aplica como variables CSS. null = tema base del storefront.
             'theme' => $themes->publicTheme(),
+            // Botón de WhatsApp (Fase 10). null = desactivado
+            'whatsapp' => $whatsapp->public(),
         ]]);
     }
 }

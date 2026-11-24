@@ -84,7 +84,7 @@ class ReturnResource extends Resource
                         TextEntry::make('orderItem.product_name')->label('Producto')->columnSpan(2)
                             ->belowContent(fn (ReturnItem $record) => trim(($record->orderItem?->variant_label ? $record->orderItem->variant_label.' · ' : '').'SKU '.$record->orderItem?->sku)),
                         TextEntry::make('quantity')->label('Cantidad')
-                            ->belowContent(fn (ReturnItem $record) => OrderResource::money($record->quantity * ($record->orderItem?->unit_price ?? 0))),
+                            ->belowContent(fn (ReturnItem $record) => OrderResource::money($record->orderItem?->paidFor($record->quantity) ?? 0)),
                         TextEntry::make('condition')->label('Al recibir')->placeholder('Sin recibir')
                             ->formatStateUsing(fn ($state) => ReturnRequest::CONDITIONS[$state] ?? $state)
                             ->belowContent(fn (ReturnItem $record) => $record->condition ? ($record->restock ? 'Volvió al stock' : 'No volvió al stock') : null),

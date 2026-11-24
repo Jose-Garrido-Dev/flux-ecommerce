@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             ModuleStatusSeeder::class,
             EmailTemplateSeeder::class,
             ContentSeeder::class,
+            MarketingSeeder::class,
         ]);
     }
 }

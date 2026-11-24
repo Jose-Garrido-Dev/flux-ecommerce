@@ -27,7 +27,7 @@ class OrderPresenter
     /** @param bool $full con sesión del dueño: dirección completa. Por token: solo comuna y región. */
     public function present(Order $order, bool $full): array
     {
-        $order->loadMissing(['items', 'shippingLine', 'events', 'latestPayment', 'shipments.items.orderItem', 'shipments.events', 'returns.items.orderItem']);
+        $order->loadMissing(['items', 'adjustments', 'shippingLine', 'events', 'latestPayment', 'shipments.items.orderItem', 'shipments.events', 'returns.items.orderItem']);
         $returnable = $this->returns->returnable($order);
         $blocker = $this->returns->customerBlocker($order);
         $address = $order->shipping_address;
@@ -56,8 +56,11 @@ class OrderPresenter
                 'quantity' => $i->quantity,
                 'unit_price' => $i->unit_price,
                 'line_total' => $i->line_total,
+                'discount' => $i->discount_amount,
             ])->all(),
             'subtotal' => $order->subtotal,
+            'discount_total' => $order->discount_total,
+            'discounts' => $order->adjustments->map(fn ($a) => ['label' => $a->label, 'amount' => $a->amount, 'target' => $a->target])->all(),
             'shipping_total' => $order->shipping_total,
             'tax_total' => $order->tax_total,
             'grand_total' => $order->grand_total,

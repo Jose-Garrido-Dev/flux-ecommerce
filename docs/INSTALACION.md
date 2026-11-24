@@ -428,6 +428,8 @@ El panel mostrará una alerta si el scheduler deja de reportar actividad.
 
 **Correos de la tienda.** Todos los correos (pedido, pago, cancelación, reembolso, despachos, devoluciones y cuenta del cliente) se envían por la cola. Cada uno queda en *Correos → Historial* con su estado: si fallan, la cola los reintenta al minuto y a los 5 minutos; después de 3 intentos quedan como *Falló* y se pueden reenviar desde ahí. Si quedan en *En cola*, el worker no está corriendo.
 
+**Campañas y correos automáticos (Fase 10).** El scheduler ejecuta cada minuto `marketing:send-due-campaigns` (inicia las campañas programadas) y cada 10 minutos `marketing:run-automations` (bienvenida, carrito abandonado y después de la compra). Las campañas salen por el worker en lotes de 50 cada 30 segundos (unas 6.000 por hora). Sin scheduler no salen las programadas; sin worker quedan *En cola*. Para probar a mano: `php artisan marketing:send-due-campaigns` y `php artisan marketing:run-automations`.
+
 **Importaciones de productos.** Las importaciones de CSV o Excel corren en el worker de colas. Si una importación se queda en "En cola" más de un minuto, el worker no está corriendo. En desarrollo sin Docker, ábrelo en otra terminal con `php artisan queue:work`.
 
 Una importación grande puede tardar hasta 15 minutos. Por eso `DB_QUEUE_RETRY_AFTER` (en `backend/.env`) debe ser mayor que eso: el valor por defecto es `960` segundos. Si lo bajas, el worker podría repetir una importación que todavía está en curso.
@@ -612,6 +614,21 @@ El detalle de cada pantalla está en el manual del panel (botón **Manual** en c
 Sin eso, los cambios igual aparecen solos en 5 a 10 minutos.
 
 **Vista previa.** El botón *Vista previa* abre `/vista-previa/...` en la tienda con un enlace firmado que vence en 2 horas. Requiere que `FLUX_STOREFRONT_URL` apunte a la dirección pública de la tienda.
+
+### 9.6 Cupones, boletín, blog y SEO (Fase 10)
+
+1. **Marketing → Cupones** y **Marketing → Promociones**: descuentos con código o automáticos (por monto, por cantidad, por categoría/marca y "lleva X paga menos"). El carrito y el pago muestran el descuento; el pedido guarda cuánto se descontó en cada producto.
+2. **Marketing → Boletín**: suscriptores con doble confirmación. Se suscriben en el pie de la tienda, al comprar o en Mi cuenta. Nadie recibe campañas sin confirmar su correo, y todos los correos llevan **Darme de baja** y la baja en un clic de Gmail y Outlook.
+3. **Marketing → Campañas**: escribe el correo, **Enviar prueba** y **Programar envío**. **Marketing → Automatizaciones**: activa la bienvenida, el carrito abandonado y el correo después de la compra (vienen desactivadas).
+4. **Marketing → WhatsApp**: botón flotante con tu número (enlace wa.me, sin contratar WhatsApp Business).
+5. **Contenido → Blog** y **Contenido → SEO y redirecciones**. El mapa del sitio queda en `https://tu-tienda.cl/sitemap.xml` y `robots.txt` lo anuncia. Envíalo una vez en [Google Search Console](https://search.google.com/search-console) (*Sitemaps → Agregar*). `NEXT_PUBLIC_SITE_URL` debe tener tu dominio real: con él se arman las direcciones del mapa del sitio.
+
+**Antes de enviar campañas:**
+- Revisa el límite diario de envío de tu proveedor SMTP (muchos planes de hosting permiten entre 100 y 500 correos por hora). Si tu lista es más grande, usa un SMTP con más cupo; no hace falta cambiar código, solo el `.env` (sección 5.1).
+- Los registros SPF, DKIM y DMARC de la sección 8.1 son obligatorios: sin ellos Gmail manda las campañas a spam o las rechaza.
+- Los rebotes (correos inexistentes) **no se procesan automáticamente** (*No verificada*): depende del proveedor SMTP. Si un correo falla al enviarse queda *Fallido* en la campaña y se puede reintentar.
+
+El detalle de cada pantalla está en los manuales del panel: *Cupones*, *Promociones automáticas*, *Boletín*, *Campañas*, *Automatizaciones*, *Botón de WhatsApp*, *Blog* y *SEO y redirecciones*.
 
 ## 10. Pruebas y calidad
 

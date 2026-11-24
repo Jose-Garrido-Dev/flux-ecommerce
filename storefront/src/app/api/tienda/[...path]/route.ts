@@ -14,6 +14,9 @@ const ALLOWED: Record<string, RegExp[]> = {
   GET: [/^cart$/, /^checkout\/options$/, /^geo\/regions$/, /^me$/, /^me\/orders$/, /^me\/orders\/[0-9a-f-]{36}$/, /^me\/addresses$/],
   POST: [
     /^cart\/items$/,
+    /^cart\/coupon$/,
+    /^newsletter$/,
+    /^newsletter\/(confirm|unsubscribe)$/,
     /^checkout$/,
     /^orders\/[A-Za-z0-9_-]{20,100}\/(pay|cancel|returns)$/,
     /^orders\/[A-Za-z0-9_-]{20,100}\/returns\/[0-9a-f-]{36}\/cancel$/,
@@ -24,7 +27,7 @@ const ALLOWED: Record<string, RegExp[]> = {
   ],
   PATCH: [/^cart\/items\/[^/]{1,64}$/, /^me$/, /^me\/addresses\/\d+$/],
   PUT: [/^me\/password$/],
-  DELETE: [/^cart\/items\/[^/]{1,64}$/, /^me\/addresses\/\d+$/],
+  DELETE: [/^cart\/items\/[^/]{1,64}$/, /^cart\/coupon$/, /^me\/addresses\/\d+$/],
 };
 
 type Params = { params: Promise<{ path: string[] }> };
