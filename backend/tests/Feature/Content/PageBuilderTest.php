@@ -16,6 +16,7 @@ use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -242,5 +243,14 @@ class PageBuilderTest extends TestCase
         Http::assertSent(fn ($request) => $request->url() === 'http://tienda.interna:3000/api/revalidate'
             && $request->header('x-revalidate-secret')[0] === 'secreto'
             && in_array('home', $request['tags'], true));
+    }
+
+    public function test_publishing_works_even_if_the_storefront_is_down(): void
+    {
+        config(['flux.revalidate_secret' => 'secreto', 'flux.storefront_internal_url' => 'http://tienda.interna:3000', 'queue.default' => 'sync']);
+        Http::fake(['tienda.interna:3000/*' => fn () => throw new ConnectionException('Sin conexión')]);
+        $page = $this->pages->create(['title' => 'Nosotros', 'slug' => 'nosotros'], [['type' => 'rich_text', 'data' => ['body' => 'Hola']]]);
+        $this->pages->publish($page);
+        $this->getJson(self::API.'/pages/nosotros')->assertOk();
     }
 }
